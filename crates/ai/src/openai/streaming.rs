@@ -8,8 +8,7 @@ use crate::openai::completions::{
     OpenAIChatCompletionRequest, OpenAICompletionChunk, OpenAIMessage,
 };
 
-// let openrouter_key = env::var("OPENROUTER_KEY").unwrap();
-
+#[derive(Debug, Clone)]
 pub struct OpenAIClient {
     key: String,
 }
@@ -20,7 +19,7 @@ impl OpenAIClient {
     }
 
     pub async fn completion(
-        &self,
+        self,
         model: String,
         messages: Vec<OpenAIMessage>,
         temperature: Option<f32>,
@@ -37,7 +36,7 @@ impl OpenAIClient {
 
         let request = client
             .post("https://openrouter.ai/api/v1/chat/completions")
-            .bearer_auth(&self.key)
+            .bearer_auth(self.key)
             .json(&openai_req_body)
             .send()
             .await?;

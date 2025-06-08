@@ -4,6 +4,7 @@ use ai::openai::streaming::OpenAIClient;
 use axum::Router;
 
 use backend::{routes, state::AppState};
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();

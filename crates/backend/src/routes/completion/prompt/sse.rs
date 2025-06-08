@@ -1,0 +1,34 @@
+use std::{sync::Arc, time::Duration};
+
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::{IntoResponse, Sse, sse::Event},
+};
+use futures::StreamExt;
+use serde_json::json;
+use uuid::Uuid;
+
+use crate::state::{ApiDelta, AppState};
+
+pub async fn handler(
+    Path(stream_id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let Some(recv) = state.get_stream(&stream_id) else {
+        return (StatusCode::BAD_REQUEST).into_response();
+    };
+
+    let stream = recv.into_stream().map(|delta| match delta {
+        ApiDelta::Chunk(mut chunk) => Event::default().json_data(chunk.choices.remove(0).delta),
+        ApiDelta::Done => Event::default().json_data(json!({ "control": "done" })),
+    });
+
+    Sse::new(stream)
+        .keep_alive(
+            axum::response::sse::KeepAlive::new()
+                .interval(Duration::from_secs(1))
+                .text("keep-alive-text"),
+        )
+        .into_response()
+}

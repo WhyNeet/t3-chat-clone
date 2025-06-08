@@ -1,11 +1,19 @@
 use std::sync::Arc;
 
-use axum::{Router, routing::post};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 
 use crate::state::AppState;
 
 pub mod prompt;
 
 pub fn router() -> Router<Arc<AppState>> {
-    Router::new().route("/completion/prompt", post(prompt::handler))
+    Router::new()
+        .route("/completions/prompt", post(prompt::handler))
+        .route(
+            "/completions/prompt/sse/{stream_id}",
+            get(prompt::sse::handler),
+        )
 }

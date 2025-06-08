@@ -128,6 +128,7 @@ version = "0.1.0"
 dependencies = [
  "ai",
  "axum",
+ "serde_json",
  "tokio",
  "tracing-subscriber",
 ]

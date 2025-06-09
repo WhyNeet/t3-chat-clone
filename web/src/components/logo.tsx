@@ -1,0 +1,21 @@
+import type { HTMLAttributes } from "react";
+
+export type LogoAttributes = HTMLAttributes<SVGElement>;
+
+export function Logo(props: LogoAttributes) {
+  return (
+    <svg
+      {...props}
+      width="278"
+      height="278"
+      viewBox="0 0 278 278"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M139 0C141.714 75.6149 202.385 136.286 278 139C202.385 141.714 141.714 202.385 139 278C136.286 202.385 75.6149 141.714 0 139C75.6149 136.286 136.286 75.6149 139 0Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}

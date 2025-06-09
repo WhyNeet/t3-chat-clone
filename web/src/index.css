@@ -1,2 +1,7 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+
+@theme {
+  --font-display: "Space Grotesk Variable", var(--font-mono);
+  --font-sans: "Geist Variable", var(--font-sans);
+}

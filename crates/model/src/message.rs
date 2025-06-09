@@ -1,5 +1,6 @@
 use std::fmt;
 
+use chrono::Utc;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +11,8 @@ pub struct ChatMessage {
     pub content: String,
     pub role: Role,
     pub chat_id: ObjectId,
-    pub index: u64,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
+    pub timestamp: chrono::DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]

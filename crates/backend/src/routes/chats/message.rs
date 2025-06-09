@@ -7,6 +7,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use chrono::Utc;
 use futures::{StreamExt, TryStreamExt};
 use model::message::{ChatMessage, Role};
 use mongodb::bson::{doc, oid::ObjectId};
@@ -77,7 +78,7 @@ pub async fn handler(
         content: payload.message.clone(),
         role: Role::User,
         chat_id: chat.id.unwrap(),
-        index: messages.len() as u64,
+        timestamp: Utc::now(),
     };
 
     state
@@ -92,7 +93,6 @@ pub async fn handler(
         content: payload.message,
     });
 
-    let response_index = messages.len();
     let assistant_message_id = ObjectId::new();
     let task_state = Arc::clone(&state);
     tokio::spawn(async move {
@@ -104,7 +104,7 @@ pub async fn handler(
                 content: String::new(),
                 role: Role::Assistant,
                 chat_id: chat.id.unwrap(),
-                index: response_index as u64,
+                timestamp: Utc::now(),
             })
             .await
             .unwrap();

@@ -4,6 +4,7 @@ use ai::openai::streaming::OpenAIClient;
 use axum::Router;
 
 use backend::{logger::Logger, routes, state::AppState};
+use mongodb::{Client, options::ClientOptions};
 use tower_http::cors::CorsLayer;
 
 #[tokio::main]
@@ -15,9 +16,15 @@ async fn main() {
 
     tracing::info!("Starting T3 Chat Clone backend.");
 
+    let mongodb = {
+        let client_uri = env::var("MONGODB_URI").expect("Missing MongoDB URI");
+
+        let options = ClientOptions::parse(&client_uri).await.unwrap();
+        Client::with_options(options).unwrap()
+    };
     let openrouter =
         OpenAIClient::new(env::var("OPENROUTER_KEY").expect("Missing OpenRouter API key"));
-    let app_state = AppState::new(openrouter);
+    let app_state = AppState::new(openrouter, mongodb).await.unwrap();
 
     let app = Router::new()
         .merge(routes::router())

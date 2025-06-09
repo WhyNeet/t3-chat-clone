@@ -17,3 +17,8 @@ tower-http = { version = "0.6.6", features = ["cors"] }
 tracing = "0.1.41"
 anyhow = "1.0.98"
 tracing-appender = "0.2.3"
+mongodb = "3.2.3"
+async-trait = "0.1.88"
+validator = { version = "0.20.0", features = ["derive"] }
+model = { path = "../model" }
+argon2 = "0.5.3"

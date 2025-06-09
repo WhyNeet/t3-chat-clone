@@ -5,13 +5,17 @@ use std::sync::Arc;
 use ai::openai::completions::OpenAIMessage;
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use futures::TryStreamExt;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::{
-    payload::completion::PromptCompletionPayload,
-    state::{ApiDelta, AppState},
-};
+use crate::state::{ApiDelta, AppState};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PromptCompletionPayload {
+    pub message: String,
+    pub model: String,
+}
 
 pub async fn handler(
     State(state): State<Arc<AppState>>,

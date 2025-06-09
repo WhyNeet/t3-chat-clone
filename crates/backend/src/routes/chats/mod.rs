@@ -9,9 +9,11 @@ use crate::state::AppState;
 
 pub mod create;
 pub mod list;
+pub mod message;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/chats/create", post(create::handler))
         .route("/chats/list", get(list::handler))
+        .route("/chats/{chat_id}/message", post(message::handler))
 }

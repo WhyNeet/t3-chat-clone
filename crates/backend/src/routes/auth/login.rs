@@ -83,16 +83,13 @@ pub async fn handler(
     mac.update(session_id.to_string().as_bytes());
 
     let signature = mac.finalize().into_bytes();
-
-    let cookie = Cookie::build((
-        SESSION_ID_COOKIE_NAME,
-        format!("{session_id}.{signature:x}"),
-    ))
-    .path("/")
-    .same_site(SameSite::None)
-    .http_only(true)
-    .max_age(Duration::seconds(SESSION_EXPIRATION as i64))
-    .build();
+    let signature = hex::encode(signature);
+    let cookie = Cookie::build((SESSION_ID_COOKIE_NAME, format!("{session_id}.{signature}")))
+        .path("/")
+        .same_site(SameSite::None)
+        .http_only(true)
+        .max_age(Duration::seconds(SESSION_EXPIRATION as i64))
+        .build();
 
     (
         StatusCode::OK,

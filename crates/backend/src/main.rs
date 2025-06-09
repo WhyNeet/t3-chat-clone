@@ -3,7 +3,7 @@ use std::{env, process, sync::Arc};
 use ai::openai::streaming::OpenAIClient;
 use axum::Router;
 
-use backend::{logger::Logger, routes, state::AppState};
+use backend::{logger::Logger, middleware::auth::AuthMiddlewareLayer, routes, state::AppState};
 use mongodb::{Client, options::ClientOptions};
 use tower_http::cors::CorsLayer;
 
@@ -36,11 +36,13 @@ async fn main() {
     let app_state = AppState::new(openrouter, mongodb, redis, session_key)
         .await
         .unwrap();
+    let app_state = Arc::new(app_state);
 
     let app = Router::new()
         .merge(routes::router())
-        .with_state(Arc::new(app_state))
-        .layer(CorsLayer::very_permissive());
+        .with_state(Arc::clone(&app_state))
+        .layer(CorsLayer::very_permissive())
+        .layer(AuthMiddlewareLayer { state: app_state });
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await.unwrap();

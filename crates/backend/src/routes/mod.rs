@@ -2,6 +2,7 @@ pub mod auth;
 pub mod chats;
 pub mod completion;
 pub mod service;
+pub mod users;
 
 use std::sync::Arc;
 
@@ -14,4 +15,5 @@ pub fn router() -> Router<Arc<AppState>> {
         .merge(service::router())
         .merge(completion::router())
         .merge(auth::router())
+        .merge(users::router())
 }

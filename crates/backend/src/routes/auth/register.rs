@@ -46,7 +46,7 @@ pub async fn handler(
         password: hashed_password,
     };
 
-    if let Err(e) = state.users().create(user).await {
+    if let Err(e) = state.database().users.create(user).await {
         let error_string = e.to_string();
         let exists = match e.downcast::<mongodb::error::Error>().unwrap().kind.as_ref() {
             ErrorKind::Write(err) => match err {

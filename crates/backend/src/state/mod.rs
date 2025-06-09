@@ -5,7 +5,7 @@ use std::{
 
 use crate::data::mongodb::MongoDataAdapter;
 use ai::openai::{completions::OpenAICompletionChunk, streaming::OpenAIClient};
-use model::user::User;
+use model::{chat::Chat, user::User};
 use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
 use redis_om::redis::aio::MultiplexedConnection;
 use uuid::Uuid;
@@ -13,7 +13,7 @@ use uuid::Uuid;
 pub struct AppState {
     openrouter: OpenAIClient,
     streams: Arc<Mutex<HashMap<Uuid, flume::Receiver<ApiDelta>>>>,
-    users: MongoDataAdapter<User>,
+    database: Database,
     redis: MultiplexedConnection,
     hmac_key: Box<[u8]>,
 }
@@ -36,13 +36,21 @@ impl AppState {
                     .build(),
             )
             .await?;
+        client.database("chat").create_collection("chats").await?;
 
         let conn = redis.get_multiplexed_tokio_connection().await?;
 
         Ok(Self {
             openrouter,
             streams: Default::default(),
-            users: MongoDataAdapter::new(client, "chat".to_string(), "users".to_string()),
+            database: Database {
+                users: MongoDataAdapter::new(
+                    client.clone(),
+                    "chat".to_string(),
+                    "users".to_string(),
+                ),
+                chats: MongoDataAdapter::new(client, "chat".to_string(), "chats".to_string()),
+            },
             redis: conn,
             hmac_key,
         })
@@ -64,10 +72,6 @@ impl AppState {
         self.streams.lock().unwrap().remove(id);
     }
 
-    pub fn users(&self) -> &MongoDataAdapter<User> {
-        &self.users
-    }
-
     pub fn redis(&self) -> MultiplexedConnection {
         self.redis.clone()
     }
@@ -75,9 +79,18 @@ impl AppState {
     pub fn hmac_key(&self) -> &[u8] {
         &self.hmac_key
     }
+
+    pub fn database(&self) -> &Database {
+        &self.database
+    }
 }
 
 pub enum ApiDelta {
     Chunk(OpenAICompletionChunk),
     Done,
+}
+
+pub struct Database {
+    pub users: MongoDataAdapter<User>,
+    pub chats: MongoDataAdapter<Chat>,
 }

@@ -8,7 +8,8 @@ use crate::{middleware::auth::Auth, payload::auth::UserPayload, state::AppState}
 
 pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) -> impl IntoResponse {
     let Ok(user) = state
-        .users()
+        .database()
+        .users
         .get(ObjectId::from_str(&session.user_id).unwrap())
         .await
     else {

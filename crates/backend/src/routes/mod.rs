@@ -16,4 +16,5 @@ pub fn router() -> Router<Arc<AppState>> {
         .merge(completion::router())
         .merge(auth::router())
         .merge(users::router())
+        .merge(chats::router())
 }

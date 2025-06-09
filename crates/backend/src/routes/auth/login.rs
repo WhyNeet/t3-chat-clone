@@ -39,7 +39,12 @@ pub async fn handler(
         return (StatusCode::BAD_REQUEST, Json(errors)).into_response();
     }
 
-    let Ok(user) = state.users().get_by(doc! { "email": payload.email }).await else {
+    let Ok(user) = state
+        .database()
+        .users
+        .get_by(doc! { "email": payload.email })
+        .await
+    else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 

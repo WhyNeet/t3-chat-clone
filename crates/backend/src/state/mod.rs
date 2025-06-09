@@ -5,7 +5,7 @@ use std::{
 
 use crate::data::mongodb::MongoDataAdapter;
 use ai::openai::{completions::OpenAICompletionChunk, streaming::OpenAIClient};
-use model::{chat::Chat, user::User};
+use model::{chat::Chat, message::ChatMessage, user::User};
 use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
 use redis_om::redis::aio::MultiplexedConnection;
 use uuid::Uuid;
@@ -37,6 +37,15 @@ impl AppState {
             )
             .await?;
         client.database("chat").create_collection("chats").await?;
+        client
+            .database("chat")
+            .create_collection("messages")
+            .await?;
+        client
+            .database("chat")
+            .collection::<User>("messages")
+            .create_index(IndexModel::builder().keys(doc! { "chat_id": 1 }).build())
+            .await?;
 
         let conn = redis.get_multiplexed_tokio_connection().await?;
 
@@ -49,7 +58,12 @@ impl AppState {
                     "chat".to_string(),
                     "users".to_string(),
                 ),
-                chats: MongoDataAdapter::new(client, "chat".to_string(), "chats".to_string()),
+                chats: MongoDataAdapter::new(
+                    client.clone(),
+                    "chat".to_string(),
+                    "chats".to_string(),
+                ),
+                messages: MongoDataAdapter::new(client, "chat".to_string(), "messages".to_string()),
             },
             redis: conn,
             hmac_key,
@@ -68,8 +82,8 @@ impl AppState {
         self.streams.lock().unwrap().get(id).cloned()
     }
 
-    pub fn remove_stream(&self, id: &Uuid) {
-        self.streams.lock().unwrap().remove(id);
+    pub fn remove_stream(&self, id: &Uuid) -> bool {
+        self.streams.lock().unwrap().remove(id).is_some()
     }
 
     pub fn redis(&self) -> MultiplexedConnection {
@@ -93,4 +107,5 @@ pub enum ApiDelta {
 pub struct Database {
     pub users: MongoDataAdapter<User>,
     pub chats: MongoDataAdapter<Chat>,
+    pub messages: MongoDataAdapter<ChatMessage>,
 }

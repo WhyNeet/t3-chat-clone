@@ -25,12 +25,41 @@ impl<Entity: Serialize + for<'a> Deserialize<'a> + Send + Sync> MongoDataAdapter
 }
 
 impl<Entity: Serialize + for<'a> Deserialize<'a> + Send + Sync> MongoDataAdapter<Entity> {
-    pub async fn get(&self, id: ObjectId) -> anyhow::Result<Option<Entity>> {
+    pub async fn get_by_id(&self, id: ObjectId) -> anyhow::Result<Option<Entity>> {
         Ok(self
             .client
             .database(&self.db)
             .collection::<Entity>(&self.collection)
             .find_one(doc! { "_id": id })
+            .await?)
+    }
+    pub async fn get_many(&self, doc: Document) -> anyhow::Result<mongodb::Cursor<Entity>> {
+        Ok(self
+            .client
+            .database(&self.db)
+            .collection::<Entity>(&self.collection)
+            .find(doc)
+            .await?)
+    }
+    pub async fn get_many_sorted(
+        &self,
+        doc: Document,
+        sort: Document,
+    ) -> anyhow::Result<mongodb::Cursor<Entity>> {
+        Ok(self
+            .client
+            .database(&self.db)
+            .collection::<Entity>(&self.collection)
+            .find(doc)
+            .sort(sort)
+            .await?)
+    }
+    pub async fn get(&self, doc: Document) -> anyhow::Result<Option<Entity>> {
+        Ok(self
+            .client
+            .database(&self.db)
+            .collection::<Entity>(&self.collection)
+            .find_one(doc)
             .await?)
     }
     pub async fn get_by(&self, doc: Document) -> anyhow::Result<Option<Entity>> {

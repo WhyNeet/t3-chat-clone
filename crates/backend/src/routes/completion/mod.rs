@@ -11,7 +11,7 @@ pub mod prompt;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/completions/prompt", post(prompt::handler))
+        .route("/completions/prompt/{chat_id}", post(prompt::handler))
         .route(
             "/completions/prompt/sse/{stream_id}",
             get(prompt::sse::handler),

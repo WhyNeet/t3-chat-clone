@@ -4,15 +4,8 @@ use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use model::chat::Chat;
 use mongodb::bson::oid::ObjectId;
-use serde_json::json;
 
 use crate::{middleware::auth::Auth, payload::chat::ChatPayload, state::AppState};
-// use serde::{Deserialize, Serialize};
-
-// #[derive(Debug, Serialize, Deserialize)]
-// pub struct ChatCreatePayload {
-
-// }
 
 pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) -> impl IntoResponse {
     let chat = Chat {

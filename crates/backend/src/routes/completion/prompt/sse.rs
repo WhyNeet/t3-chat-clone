@@ -19,16 +19,16 @@ pub async fn handler(
         return (StatusCode::BAD_REQUEST).into_response();
     };
 
-    let stream = recv.into_stream().map(|delta| match delta {
+    let stream = recv.into_stream().map(move |delta| match delta {
         ApiDelta::Chunk(mut chunk) => Event::default().json_data(chunk.choices.remove(0).delta),
-        ApiDelta::Done => Event::default().json_data(json!({ "control": "done" })),
+        ApiDelta::Done => {
+            state.remove_stream(&stream_id);
+            tracing::debug!("Streaming finished.");
+            Event::default().json_data(json!({ "control": "done" }))
+        }
     });
 
     Sse::new(stream)
-        .keep_alive(
-            axum::response::sse::KeepAlive::new()
-                .interval(Duration::from_secs(1))
-                .text("keep-alive-text"),
-        )
+        .keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15)))
         .into_response()
 }

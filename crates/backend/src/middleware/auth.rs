@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     body::Body,
-    extract::{FromRequest, Request},
+    extract::{FromRequestParts, Request},
     http::StatusCode,
     response::Response,
 };
@@ -121,23 +121,42 @@ where
 
 pub struct Auth(pub SessionModel);
 
-impl<S> FromRequest<S> for Auth
+// impl<S> FromRequest<S> for Auth
+// where
+//     S: Send + Sync,
+// {
+//     type Rejection = StatusCode;
+
+//     fn from_request(
+//         req: Request<Body>,
+//         _state: &S,
+//     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+//         async move {
+//             let s = req
+//                 .extensions()
+//                 .get::<SessionModel>()
+//                 .ok_or(StatusCode::UNAUTHORIZED)?
+//                 .clone();
+//             Ok(Self(s))
+//         }
+//     }
+// }
+
+impl<S> FromRequestParts<S> for Auth
 where
     S: Send + Sync,
 {
     type Rejection = StatusCode;
 
-    fn from_request(
-        req: Request<Body>,
-        _state: &S,
-    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
-        async move {
-            let s = req
-                .extensions()
-                .get::<SessionModel>()
-                .ok_or(StatusCode::BAD_REQUEST)?
-                .clone();
-            Ok(Self(s))
-        }
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let s = parts
+            .extensions
+            .get::<SessionModel>()
+            .ok_or(StatusCode::UNAUTHORIZED)?
+            .clone();
+        Ok(Self(s))
     }
 }

@@ -10,7 +10,7 @@ pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) ->
     let Ok(user) = state
         .database()
         .users
-        .get(ObjectId::from_str(&session.user_id).unwrap())
+        .get_by_id(ObjectId::from_str(&session.user_id).unwrap())
         .await
     else {
         return (StatusCode::INTERNAL_SERVER_ERROR).into_response();

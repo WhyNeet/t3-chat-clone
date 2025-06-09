@@ -22,9 +22,9 @@ pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) ->
     (
         StatusCode::OK,
         Json(ChatPayload {
-            id: id.to_hex(),
+            id,
             name: chat.name,
-            user_id: chat.user_id.to_hex(),
+            user_id: chat.user_id,
             timestamp: chat.timestamp,
         }),
     )

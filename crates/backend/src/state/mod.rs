@@ -7,16 +7,24 @@ use crate::data::mongodb::MongoDataAdapter;
 use ai::openai::{completions::OpenAICompletionChunk, streaming::OpenAIClient};
 use model::user::User;
 use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
+use redis_om::redis::aio::MultiplexedConnection;
 use uuid::Uuid;
 
 pub struct AppState {
     openrouter: OpenAIClient,
     streams: Arc<Mutex<HashMap<Uuid, flume::Receiver<ApiDelta>>>>,
     users: MongoDataAdapter<User>,
+    redis: MultiplexedConnection,
+    hmac_key: Box<[u8]>,
 }
 
 impl AppState {
-    pub async fn new(openrouter: OpenAIClient, client: Client) -> anyhow::Result<Self> {
+    pub async fn new(
+        openrouter: OpenAIClient,
+        client: Client,
+        redis: redis_om::Client,
+        hmac_key: Box<[u8]>,
+    ) -> anyhow::Result<Self> {
         client.database("chat").create_collection("users").await?;
         client
             .database("chat")
@@ -29,10 +37,14 @@ impl AppState {
             )
             .await?;
 
+        let conn = redis.get_multiplexed_tokio_connection().await?;
+
         Ok(Self {
             openrouter,
             streams: Default::default(),
             users: MongoDataAdapter::new(client, "chat".to_string(), "users".to_string()),
+            redis: conn,
+            hmac_key,
         })
     }
 
@@ -54,6 +66,14 @@ impl AppState {
 
     pub fn users(&self) -> &MongoDataAdapter<User> {
         &self.users
+    }
+
+    pub fn redis(&self) -> MultiplexedConnection {
+        self.redis.clone()
+    }
+
+    pub fn hmac_key(&self) -> &[u8] {
+        &self.hmac_key
     }
 }
 

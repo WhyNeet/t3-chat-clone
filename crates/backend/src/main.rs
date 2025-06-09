@@ -22,9 +22,20 @@ async fn main() {
         let options = ClientOptions::parse(&client_uri).await.unwrap();
         Client::with_options(options).unwrap()
     };
+    let redis = {
+        let uri = env::var("REDIS_URI").expect("Missing Redis URI");
+        redis_om::Client::open(uri).unwrap()
+    };
     let openrouter =
         OpenAIClient::new(env::var("OPENROUTER_KEY").expect("Missing OpenRouter API key"));
-    let app_state = AppState::new(openrouter, mongodb).await.unwrap();
+    let session_key = env::var("SESSION_SECRET_KEY")
+        .expect("Missing session secret key")
+        .as_bytes()
+        .to_vec()
+        .into_boxed_slice();
+    let app_state = AppState::new(openrouter, mongodb, redis, session_key)
+        .await
+        .unwrap();
 
     let app = Router::new()
         .merge(routes::router())

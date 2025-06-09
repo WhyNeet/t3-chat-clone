@@ -22,3 +22,8 @@ async-trait = "0.1.88"
 validator = { version = "0.20.0", features = ["derive"] }
 model = { path = "../model" }
 argon2 = "0.5.3"
+redis-om = "0.1.0"
+hmac = "0.12.1"
+sha2 = "0.10.9"
+axum-extra = { version = "0.10.1", features = ["cookie"] }
+cookie = "0.18.1"

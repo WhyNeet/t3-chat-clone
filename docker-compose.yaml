@@ -10,3 +10,10 @@ services:
       - 27017:27017
     volumes:
       - /tmp/mongo-data:/data/db
+  redis:
+    image: redis:alpine
+    container_name: t3-chat-redis
+    ports:
+      - 6379:6379
+    volumes:
+      - /tmp/redis-data:/data

@@ -14,8 +14,8 @@ pub mod messages;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/chats/create", post(create::handler))
-        .route("/chats/list", get(list::handler))
+        .route("/chats", post(create::handler))
+        .route("/chats", get(list::handler))
         .route("/chats/{chat_id}/message", post(message::handler))
         .route("/chats/{chat_id}/messages", get(messages::handler))
 }

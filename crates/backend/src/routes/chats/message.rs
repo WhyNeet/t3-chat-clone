@@ -17,6 +17,7 @@ use uuid::Uuid;
 
 use crate::{
     middleware::auth::Auth,
+    payload::chat::ChatMessagePayload,
     state::{ApiDelta, AppState},
 };
 
@@ -81,10 +82,10 @@ pub async fn handler(
         timestamp: Utc::now(),
     };
 
-    state
+    let user_message_id = state
         .database()
         .messages
-        .create(user_message)
+        .create(user_message.clone())
         .await
         .unwrap();
 
@@ -157,5 +158,18 @@ pub async fn handler(
 
     state.insert_stream(stream_id, rx);
 
-    (StatusCode::OK, Json(json!({ "stream_id": stream_id }))).into_response()
+    (
+        StatusCode::OK,
+        Json(json!({
+          "stream_id": stream_id,
+          "user_message": ChatMessagePayload {
+            id: user_message_id,
+            chat_id: user_message.chat_id,
+            content: user_message.content,
+            role: user_message.role,
+            timestamp: user_message.timestamp
+          }
+        })),
+    )
+        .into_response()
 }

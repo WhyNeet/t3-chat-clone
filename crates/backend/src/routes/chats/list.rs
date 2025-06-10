@@ -1,6 +1,11 @@
 use std::{str::FromStr, sync::Arc};
 
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{
+    Json,
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use futures::{StreamExt, TryStreamExt};
 use mongodb::bson::{doc, oid::ObjectId};
 use serde::Deserialize;
@@ -16,7 +21,7 @@ pub struct ListChatsPayload {
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Auth(session): Auth,
-    Json(payload): Json<ListChatsPayload>,
+    Query(payload): Query<ListChatsPayload>,
 ) -> impl IntoResponse {
     let Ok(chats) = state
         .database()

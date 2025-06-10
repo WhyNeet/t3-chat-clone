@@ -56,7 +56,7 @@ pub async fn handler(
             _ => false,
         };
         return (
-            StatusCode::INTERNAL_SERVER_ERROR,
+          if exists { StatusCode::BAD_REQUEST } else { StatusCode::INTERNAL_SERVER_ERROR },
             Json(json!({ "error": if exists { "User with this email already exists." } else { &error_string }  })),
         )
             .into_response();

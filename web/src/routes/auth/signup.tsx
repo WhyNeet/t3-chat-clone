@@ -3,10 +3,10 @@ import { Logo } from "../../components/logo";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { login } from "../../lib/api/auth";
+import { login, signup } from "../../lib/api/auth";
 import { useAuthStore } from "../../lib/state/auth";
-import { isError } from "../../lib/api/error";
 import { useState } from "react";
+import { isError } from "../../lib/api/error";
 import { Loader } from "../../components/ui/loader";
 
 export interface Inputs {
@@ -14,9 +14,9 @@ export interface Inputs {
   password: string;
 }
 
-export function Login() {
+export function Signup() {
   const navigate = useNavigate();
-  const updateUser = useAuthStore(state => state.updateUser);
+  const updateUser = useAuthStore((state) => state.updateUser);
   const {
     register,
     handleSubmit,
@@ -25,21 +25,25 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
-    await login(data).then(result => {
+    await signup(data).then(async (result) => {
       if (isError(result)) {
         setError(result.error);
         return;
       }
-      updateUser(result);
+      const user = await login(data);
+      if (isError(user)) {
+        setError(user.error);
+        return;
+      }
+      updateUser(user);
       navigate("/");
-    })
-
+    });
   };
 
   return (
     <div className="h-full w-full flex items-center justify-center flex-col">
       <Logo className="h-10 w-10 text-pink-500 mb-6" />
-      <h1 className="font-display text-2xl font-bold mb-8">Welcome Back!</h1>
+      <h1 className="font-display text-2xl font-bold mb-8">Hello there!</h1>
       <form
         className="max-w-2xs w-full flex flex-col mb-10"
         onSubmit={handleSubmit(onSubmit)}
@@ -57,7 +61,11 @@ export function Login() {
             },
           })}
         />
-        {errors.email ? <p className="text-red-500 text-sm font-medium">{errors.email.message}</p> : null}
+        {errors.email ? (
+          <p className="text-red-500 text-sm font-medium">
+            {errors.email.message}
+          </p>
+        ) : null}
         <div className="h-2" />
         <Input
           placeholder="Password"
@@ -65,25 +73,36 @@ export function Login() {
           className="w-full"
           {...register("password", {
             required: { value: true, message: "Requred." },
-            minLength: { value: 8, message: "Must be at least 8 characters long." },
-            maxLength: { value: 72, message: "Must be at most 72 characters long." },
+            minLength: {
+              value: 8,
+              message: "Must be at least 8 characters long.",
+            },
+            maxLength: {
+              value: 72,
+              message: "Must be at most 72 characters long.",
+            },
           })}
         />
-        {errors.password ? <p className="text-red-500 text-sm font-medium">{errors.password.message}</p> : null}
-        <Button intent="primary" className="mt-6" disabled={isSubmitting} type="submit">
+        {errors.password ? (
+          <p className="text-red-500 text-sm font-medium">
+            {errors.password.message}
+          </p>
+        ) : null}
+        <Button
+          intent="primary"
+          className="mt-6 mb-2"
+          disabled={isSubmitting}
+          type="submit"
+        >
           {isSubmitting ? <Loader className="text-pink-950 h-5 w-5" /> : null}
-          Log In
+          Sign Up
         </Button>
         {error ? (
           <p className="text-red-500 font-medium font-display text-center text-sm">{error}</p>
         ) : null}
       </form>
       <p className="text-black/50 font-display">
-        Don't have an account?{" "}
-        <NavLink to="/auth/signup">
-          Sign Up
-        </NavLink>
-        .
+        Already have an account? <NavLink to="/auth/login">Log In</NavLink>.
       </p>
     </div>
   );

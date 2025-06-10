@@ -1,21 +1,25 @@
 import { create } from "zustand";
-import type { User } from "../user";
+import type { User } from "../model/user";
 
 export interface AuthStore {
-  user: User | null,
-  state: AuthState
-  updateUser: (user: User) => void,
-  clearUser: () => void
+  user: User | null;
+  state: AuthState;
+  error: string | null;
+  updateUser: (user: User | null) => void;
+  updateError: (error: string) => void;
+  clearUser: () => void;
 }
 
 export enum AuthState {
   Loading = 0,
-  Loaded = 1
+  Loaded = 1,
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   state: AuthState.Loading,
-  updateUser: (user: User) => set({ user, state: AuthState.Loaded }),
-  clearUser: () => set({ user: null })
+  error: null,
+  updateUser: (user) => set({ user, state: AuthState.Loaded }),
+  updateError: (error) => set({ error }),
+  clearUser: () => set({ user: null }),
 }));

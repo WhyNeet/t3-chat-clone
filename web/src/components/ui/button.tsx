@@ -24,7 +24,8 @@ export const button = cva(
           "font-semibold",
           "border-2",
           "border-pink-900",
-          "disabled:hover;bg-pink-500"
+          "disabled:hover:bg-pink-500",
+          "disabled:cursor-not-allowed"
         ],
         ghost: [
           "bg-transparent",

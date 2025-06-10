@@ -1,6 +1,6 @@
 import { NavLink } from "react-router";
 import { Logo } from "./logo";
-import { ChatsState, useChatsStore } from "../lib/state/chats";
+import { useChatsStore } from "../lib/state/chats";
 import { AuthState, useAuthStore } from "../lib/state/auth";
 import { Button } from "./ui/button";
 import { Loader } from "./ui/loader";
@@ -12,7 +12,7 @@ export function ChatsSidebar() {
     (state) => state.state === AuthState.Loading,
   );
   const chats = useChatsStore((state) => state.chats);
-  const isLoading = useChatsStore(state => state.state === ChatsState.Loading);
+  const isLoading = useChatsStore(state => state.isFetching);
 
   return (
     <aside className="min-w-72 rounded-tr-3xl h-[calc(100vh-0.25rem)] absolute right-0 flex flex-col">
@@ -28,12 +28,12 @@ export function ChatsSidebar() {
         ) : chats ? (
           <>
             <NavLink to="/" className="mb-2"><Button className="w-full" intent="primary">New Chat</Button></NavLink>
-            {chats.map((chat) => (
+            {Object.values(chats).map(({ chat }) => (
               <NavLink
                 key={chat.id}
                 to={`/chat/${chat.id}`}
                 className={({ isActive }) =>
-                  `w-full rounded-lg hover:bg-pink-50 border-2 border-transparent px-4 py-2 font-medium font-display group flex items-center justify-between ${isActive ? "border-pink-800 bg-pink-50" : ""}`
+                  `w-full rounded-lg border-2 border-transparent px-4 py-2 font-medium font-display group flex items-center justify-between ${isActive ? "border-pink-800 bg-pink-50" : ""}`
                 }
               >
                 {chat.name ?? "New Chat"}

@@ -10,3 +10,13 @@ export async function chats(window: ListWindow): Promise<Chat[]> {
 
   return chats;
 }
+
+export async function createChat(): Promise<Chat> {
+  const response = await fetch(`${BACKEND_URI}/chats`, {
+    credentials: "include",
+    method: "POST"
+  });
+  const chat = await response.json();
+
+  return chat;
+}

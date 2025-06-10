@@ -6,6 +6,10 @@
   --font-sans: "Geist Variable", var(--font-sans);
 }
 
+body {
+  @apply overscroll-none;
+}
+
 a {
   @apply text-pink-600 hover:text-pink-700;
 }

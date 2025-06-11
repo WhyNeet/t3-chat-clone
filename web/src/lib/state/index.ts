@@ -7,7 +7,8 @@ import { useChatsStore } from "./chats";
 export function init() {
   const { updateUser } = useAuthStore.getState();
 
-  const { initializeChat, finishFetching, updatePendingMessage } = useChatsStore.getState();
+  const { initializeChat, finishFetching, updatePendingMessage, pendingMessages } =
+    useChatsStore.getState();
   useAuthStore.subscribe((store, prev) => {
     if (store.user && !prev.user) {
       chats({
@@ -18,14 +19,35 @@ export function init() {
           initializeChat(chat);
           const streamId = localStorage.getItem(`stream-${chat.id}`);
           if (streamId) {
-            const message = localStorage.getItem(`streaming-message-${chat.id}`) ?? "";
-            updatePendingMessage(chat.id, message);
-            subscribeToStream(streamId, (delta) => {
-              updatePendingMessage(chat.id, delta.content);
-            }, () => {
-              localStorage.removeItem(`stream-${chat.id}`);
-              localStorage.removeItem(`streaming-message-${chat.id}`);
-            });
+            const message = localStorage.getItem(
+              `streaming-message-${chat.id}`,
+            )!;
+            const reasoning = localStorage.getItem(
+              `streaming-message-reasoning-${chat.id}`,
+            )!;
+            updatePendingMessage(chat.id, { content: message, reasoning });
+            subscribeToStream(
+              streamId,
+              (delta) => {
+                updatePendingMessage(chat.id, {
+                  reasoning: delta.reasoning,
+                  content: delta.reasoning ? null : delta.content,
+                });
+                localStorage.setItem(
+                  `streaming-message-${chat.id}`,
+                  (localStorage.getItem(`streaming-message-${chat.id}`) ?? "") + delta.content,
+                );
+                localStorage.setItem(
+                  `streaming-message-reasoning-${chat.id}`,
+                  (localStorage.getItem(`streaming-message-reasoning-${chat.id}`) ?? "") + (delta.reasoning ?? ""),
+                );
+              },
+              () => {
+                localStorage.removeItem(`stream-${chat.id}`);
+                localStorage.removeItem(`streaming-message-${chat.id}`);
+                localStorage.removeItem(`streaming-message-reasoning-${chat.id}`);
+              },
+            );
           }
         }
         finishFetching();

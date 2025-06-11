@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { ChatsSidebar } from "../components/chats-sidebar";
 import { ChevronRight } from "lucide-react";
@@ -7,10 +7,20 @@ import { Prompt } from "../components/prompt";
 
 export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const viewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!viewRef.current) return;
+    viewRef.current.classList.add("transition-all!");
+    const id = setTimeout(() => {
+      viewRef.current!.classList.remove("transition-all!");
+    }, 201);
+    return () => clearTimeout(id);
+  }, [sidebarOpen]);
 
   return (
     <div
-      className={`h-full w-full flex items-stretch transition-all relative duration-200 bg-pink-200 ${sidebarOpen ? "pt-1" : ""}`}
+      className={`h-full w-full flex relative transition-[padding-top] duration-200 bg-pink-200 ${sidebarOpen ? "pt-1" : ""}`}
     >
       <div
         className={`transition-all duration-200 ease-in-out relative ${sidebarOpen ? "min-w-72 w-72" : "min-w-0 w-0"}`}
@@ -18,7 +28,8 @@ export function App() {
         <ChatsSidebar />
       </div>
       <div
-        className={`h-full w-full bg-white transition-all duration-200 ${sidebarOpen ? "rounded-tl-3xl" : ""} relative`}
+        ref={viewRef}
+        className={`h-full bg-white transition-none duration-200 ${sidebarOpen ? "rounded-tl-3xl w-[calc(100vw-288px)]" : "w-full"} relative`}
       >
         <div className="fixed top-3 left-3">
           <Button

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@import "tw-animate-css";
 
 @import "./code.css";
 
@@ -38,13 +39,15 @@ span.size-48 {
 
 
 .prose pre {
-  @apply p-0 rounded-lg
+  color: black;
+  background: rgb(245, 242, 240);
+  @apply rounded-lg px-3 py-2
 }
 
-.prose pre>div {
-  margin: 0 !important;
+.prose pre>figure {
+  margin: -8px -12px !important;
 }
 
-.prose pre * {
+code {
   font-family: "JetBrains Mono Variable" !important, var(--font-mono);
 }

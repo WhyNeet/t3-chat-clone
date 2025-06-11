@@ -29,24 +29,26 @@ export function ChatsSidebar() {
         ) : chats ? (
           <>
             <NavLink to="/" className="mb-2"><Button className="w-full" intent="primary">New Chat</Button></NavLink>
-            {Object.values(chats).map(({ chat }) => (
-              <NavLink
-                key={chat.id}
-                to={`/chat/${chat.id}`}
-                className={({ isActive }) =>
-                  `w-full rounded-lg border-2 border-transparent px-4 py-2 font-medium font-display group flex items-center justify-between ${isActive ? "border-pink-800 bg-pink-50" : ""}`
-                }
-              >
-                {chat.name ?? "New Chat"}
-                <div className="hidden group-hover:block">
-                  <Ellipsis className="h-6 w-6 stroke-2" />
-                </div>
-              </NavLink>
-            ))}
+            <div className="flex flex-col-reverse">
+              {Object.values(chats).map(({ chat }) => (
+                <NavLink
+                  key={chat.id}
+                  to={`/chat/${chat.id}`}
+                  className={({ isActive }) =>
+                    `w-full rounded-lg border-2 border-transparent px-4 py-2 font-medium font-display group flex items-center justify-between ${isActive ? "border-pink-800 bg-pink-50" : ""}`
+                  }
+                >
+                  {chat.name ?? "New Chat"}
+                  <div className="hidden group-hover:block">
+                    <Ellipsis className="h-6 w-6 stroke-2" />
+                  </div>
+                </NavLink>
+              ))}
+            </div>
           </>
         ) : (
           <div>Error.</div>
-        ) : <div>logged out</div>}
+        ) : <NavLink to="/" className="mb-2"><Button className="w-full" intent="primary">New Chat</Button></NavLink>}
       </div>
       {isUserLoading ? null : isLoggedIn ? null : (
         <div className="rounded-lg border border-pink-800 bg-pink-50 px-4 py-3 m-2">

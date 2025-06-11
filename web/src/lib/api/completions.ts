@@ -1,6 +1,7 @@
 import { BACKEND_URI } from "../constants";
+import type { ChatMessage } from "../model/message";
 
-export function subscribeToStream(streamId: string, callback: (delta: OpenAICompletionDelta) => void, close?: () => void) {
+export function subscribeToStream(streamId: string, callback: (delta: OpenAICompletionDelta) => void, close?: (message: ChatMessage) => void) {
   const events = new EventSource(
     `${BACKEND_URI}/completions/prompt/sse/${streamId}`,
   );
@@ -11,7 +12,7 @@ export function subscribeToStream(streamId: string, callback: (delta: OpenAIComp
       switch (data.control) {
         case "done":
           events.close();
-          close?.();
+          close?.(data.message);
           return;
       }
     }
@@ -21,11 +22,13 @@ export function subscribeToStream(streamId: string, callback: (delta: OpenAIComp
 
 export interface OpenAICompletionDelta {
   content: string;
+  reasoning: string | null;
   role: string;
 }
 
 export interface CompletionControlData {
   control: "done";
+  message: ChatMessage;
 }
 
 export type CompletionData = OpenAICompletionDelta | CompletionControlData;

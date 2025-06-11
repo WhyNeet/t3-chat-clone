@@ -13,14 +13,15 @@ export function Chat() {
   const chatId = params["chatId"] as string;
   const messages = useChatsStore((state) =>
     state.chats[chatId]?.state.status === "success"
-      ? state.chats[chatId].state.messages
+      ? state.chats[chatId].messages
       : null,
   );
-  const setMessages = useChatsStore((state) => state.addChatMessages);
-  const setChatState = useChatsStore((state) => state.setChatState);
-  const pendingMessage = useChatsStore(
-    (state) => state.pendingMessages[chatId],
+  const chatLoading = useChatsStore(
+    (state) => state.chats[chatId]?.state.status === "loading",
   );
+  const setMessages = useChatsStore((state) => state.setChatMessages);
+  const setChatState = useChatsStore((state) => state.setChatState);
+  const pendingMessage = useChatsStore(state => state.pendingMessages[chatId]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +35,12 @@ export function Chat() {
 
   useEffect(() => {
     if (!scrollWrapper.current || !scrollableContainer.current) return;
-    if (scrollableContainer.current.clientHeight - scrollWrapper.current.scrollHeight > 100) return;
+    if (
+      scrollableContainer.current.getBoundingClientRect().height -
+      scrollWrapper.current.scrollTop >
+      120
+    )
+      return;
     scrollWrapper.current.scrollTo({
       top: scrollableContainer.current.clientHeight,
       behavior: "instant",
@@ -42,7 +48,7 @@ export function Chat() {
   }, [pendingMessage]);
 
   useEffect(() => {
-    if (!messages) {
+    if (!chatLoading && !messages) {
       setChatState(chatId, { status: "loading" });
       fetchChatMessages(chatId, {
         start: 0,
@@ -54,27 +60,31 @@ export function Chat() {
           setError(result.error);
           return;
         }
-        setChatState(chatId, { status: "success", messages: result });
+        setChatState(chatId, { status: "success" });
         setMessages(chatId, result);
       });
     } else {
       setIsLoading(false);
     }
-  }, [messages, chatId, setMessages, setChatState]);
+  }, [messages, chatId, setMessages, setChatState, chatLoading]);
 
   return (
     <div
-      className="w-full h-full overflow-y-scroll p-6 pb-24 overscroll-contain"
+      className="w-full h-full overflow-y-scroll p-6 pb-32 overscroll-contain"
       ref={scrollWrapper}
     >
       {isLoading ? "loading" : null}
       {error ? `error: ${error}` : null}
-      <div className="max-w-4xl flex flex-col-reverse mx-auto" ref={scrollableContainer}>
+      <div
+        className="max-w-4xl flex flex-col-reverse mx-auto"
+        ref={scrollableContainer}
+      >
         {pendingMessage ? (
           <Message
             message={{
               chat_id: chatId,
-              content: pendingMessage,
+              content: pendingMessage.content,
+              reasoning: pendingMessage.reasoning,
               id: "pending-message",
               role: Role.Assistant,
               timestamp: "",

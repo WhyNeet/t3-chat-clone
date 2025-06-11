@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "../components/ui/button";
-import { Command, SendHorizonal } from "lucide-react";
+import { Brain, ChevronDownIcon, Command, SendHorizonal } from "lucide-react";
 import { useParams } from "react-router";
 import { createMessage } from "../lib/api/messages";
 import { subscribeToStream } from "../lib/api/completions";
@@ -8,6 +8,17 @@ import { createChat } from "../lib/api/chats";
 import { useChatsStore } from "../lib/state/chats";
 import { Loader } from "../components/ui/loader";
 import { useNavigate } from "react-router";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { cn } from "./utils";
+
+const mockModelsList = [
+  {
+    name: "Gemini 2.0 Flash",
+    model: "google/gemini-2.0-flash-exp:free",
+    reasoning: false,
+  },
+  { name: "DeepSeek R1", model: "deepseek/deepseek-r1:free", reasoning: true },
+];
 
 export function Prompt() {
   const navigate = useNavigate();
@@ -15,6 +26,7 @@ export function Prompt() {
   const updatePendingMessage = useChatsStore(
     (state) => state.updatePendingMessage,
   );
+  const clearPendingMessage = useChatsStore(state => state.clearPendingMessage);
   const addMessages = useChatsStore((state) => state.addChatMessages);
   const addChat = useChatsStore((state) => state.initializeChat);
   const params = useParams();
@@ -24,37 +36,64 @@ export function Prompt() {
   );
   const [isStreaming, setIsStreaming] = useState(!!pendingMessage);
 
+  const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
+  const [isReasoning, setIsReasoning] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(mockModelsList[0]);
+
+  const handleModelSelectorClick = (model: {
+    name: string;
+    model: string;
+    reasoning: boolean;
+  }) => {
+    setSelectedModel(model);
+    setIsModelSelectorOpen(false);
+  };
+
   const sendMessage = async () => {
     if (!chatId) {
       const chat = await createChat();
       addChat(chat);
       navigate(`/chat/${chat.id}`);
-      await sendAndSubscribe(chat.id);
+      await sendAndSubscribe(chat.id, selectedModel.model, true);
     } else {
       navigate(`/chat/${chatId}`);
-      await sendAndSubscribe(chatId);
+      await sendAndSubscribe(chatId, selectedModel.model);
     }
   };
 
-  const sendAndSubscribe = async (chatId: string) => {
+  const sendAndSubscribe = async (chatId: string, model: string, newChat = false) => {
+    setIsStreaming(true);
     const { stream_id, user_message } = await createMessage(chatId, {
       message,
-      model: "google/gemini-2.0-flash-exp:free",
+      model,
+      reasoning: isReasoning ? "medium" : null,
     });
-    addMessages(chatId, [user_message]);
+    if (!newChat) addMessages(chatId, [user_message]);
     setMessage("");
-    setIsStreaming(true);
     localStorage.setItem(`stream-${chatId}`, stream_id);
     subscribeToStream(
       stream_id,
       (delta) => {
-        updatePendingMessage(chatId, delta.content);
-        localStorage.setItem(`streaming-message-${chatId}`, (pendingMessage ?? "") + delta.content);
+        updatePendingMessage(chatId, {
+          content: delta.content,
+          reasoning: delta.reasoning,
+        });
+        localStorage.setItem(
+          `streaming-message-${chatId}`,
+          (localStorage.getItem(`streaming-message-${chatId}`) ?? "") + delta.content,
+        );
+        localStorage.setItem(
+          `streaming-message-reasoning-${chatId}`,
+          (localStorage.getItem(`streaming-message-reasoning-${chatId}`) ?? "") + (delta.reasoning ?? ""),
+        );
       },
-      () => {
+      (message) => {
         localStorage.removeItem(`stream-${chatId}`);
         localStorage.removeItem(`streaming-message-${chatId}`);
+        localStorage.removeItem(`streaming-message-reasoning-${chatId}`);
         setIsStreaming(false);
+        clearPendingMessage(chatId);
+        addMessages(chatId, [message]);
       },
     );
   };
@@ -66,7 +105,7 @@ export function Prompt() {
           value={message}
           onInput={(e) => setMessage(e.currentTarget.value)}
           className="resize-none w-full outline-none border-0 placeholder:font-display placeholder:text-pink-900/40 pl-2 pt-2"
-          placeholder="Message Gemini 2.0 Flash"
+          placeholder={`Message ${selectedModel.name}`}
         />
         <div className="text-center">
           <Button
@@ -84,6 +123,47 @@ export function Prompt() {
             {" + "}Enter
           </p>
         </div>
+      </div>
+      <div className="flex gap-1 items-center h-7">
+        <Popover
+          open={isModelSelectorOpen}
+          onOpenChange={setIsModelSelectorOpen}
+        >
+          <PopoverTrigger asChild>
+            <Button intent="ghost" size="small" className="gap-1 text-pink-900">
+              {selectedModel.name}
+              <ChevronDownIcon className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 bg-white pt-4 pb-2">
+            <h3 className="font-display font-semibold mb-2 px-4">Models</h3>
+            <div className="flex flex-col w-full px-2">
+              {mockModelsList.map((model) => (
+                <button
+                  onClick={() => handleModelSelectorClick(model)}
+                  className="py-3 px-4 hover:bg-pink-900/10 rounded-md transition text-left cursor-pointer text-sm font-display font-medium"
+                  key={model.model}
+                >
+                  {model.name}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        {selectedModel.reasoning ? (
+          <Button
+            onClick={() => setIsReasoning((prev) => !prev)}
+            intent="ghost"
+            size="small"
+            className={cn(
+              "gap-1.5 border-pink-900/20 border rounded-full text-pink-900 transition",
+              isReasoning ? "hover:bg-pink-900/10 bg-pink-800/10" : "",
+            )}
+          >
+            <Brain className="h-4 w-4" />
+            Reasoning
+          </Button>
+        ) : null}
       </div>
     </div>
   );

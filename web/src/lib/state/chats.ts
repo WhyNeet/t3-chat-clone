@@ -28,16 +28,23 @@ import type { ChatMessage } from "../model/message";
 export type ChatState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; messages: ChatMessage[] }
+  | { status: "success" }
   | { status: "error"; error: string };
 
 export interface ChatStore {
-  chats: Record<string, { chat: Chat; state: ChatState }>; // id -> ChatState
-  pendingMessages: Record<string, string | null>; // id -> pending message string
+  chats: Record<string, { chat: Chat; state: ChatState, messages: ChatMessage[] }>; // id -> ChatState
+  pendingMessages: Record<
+    string,
+    { content: string; reasoning: string | null } | null
+  >; // id -> pending message string
   isFetching: boolean;
   finishFetching: () => void;
   addChatMessages: (id: string, messages: ChatMessage[]) => void;
-  updatePendingMessage: (id: string, delta: string) => void;
+  updatePendingMessage: (
+    id: string,
+    delta: { content: string | null; reasoning: string | null },
+  ) => void;
+  setChatMessages: (id: string, messages: ChatMessage[]) => void;
   setChatState: (id: string, state: ChatState) => void;
   clearPendingMessage: (id: string) => void;
   initializeChat: (chat: Chat) => void;
@@ -50,37 +57,65 @@ export const useChatsStore = create<ChatStore>((set) => ({
   finishFetching: () => set({ isFetching: false }),
   initializeChat: (chat) => {
     set((state) => ({
-      chats: { ...state.chats, [chat.id]: { chat, state: { status: "idle" } } },
+      chats: { ...state.chats, [chat.id]: { chat, state: { status: "idle" }, messages: [] } },
       pendingMessages: { ...state.pendingMessages, [chat.id]: null },
     }));
+  },
+  setChatMessages: (id, messages) => {
+    set((state) => {
+      const currentChatState = state.chats[id];
+      return {
+        chats: {
+          ...state.chats,
+          [id]: {
+            ...currentChatState,
+            messages,
+          },
+        },
+      };
+    });
   },
   addChatMessages: (id: string, messages: ChatMessage[]) => {
     set((state) => {
       const currentChatState = state.chats[id];
-
       return {
         chats: {
           ...state.chats,
           [id]: {
             ...currentChatState,
             messages: [
-              ...(currentChatState.state.status === "success"
-                ? currentChatState.state.messages
-                : []),
               ...messages,
+              ...(currentChatState.state.status === "success"
+                ? currentChatState.messages
+                : []),
             ],
           },
         },
       };
     });
   },
-  updatePendingMessage: (id: string, delta: string) => {
-    set((state) => ({
-      pendingMessages: {
-        ...state.pendingMessages,
-        [id]: (state.pendingMessages[id] ?? "") + delta,
-      },
-    }));
+  updatePendingMessage: (id, delta) => {
+    set((state) => {
+      let reasoning = delta.content
+        ? (state.pendingMessages[id]?.reasoning ?? null)
+        : (state.pendingMessages[id]?.reasoning ?? "");
+      if (reasoning) {
+        if (delta.reasoning) reasoning += delta.reasoning;
+      } else {
+        if (delta.reasoning) reasoning += delta.reasoning;
+      }
+      return {
+        pendingMessages: {
+          ...state.pendingMessages,
+          [id]: {
+            content:
+              (state.pendingMessages[id]?.content ?? "") +
+              (delta.content ?? ""),
+            reasoning,
+          },
+        },
+      };
+    });
   },
   clearPendingMessage: (id: string) => {
     set((state) => ({

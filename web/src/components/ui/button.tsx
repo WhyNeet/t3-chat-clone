@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef, type ComponentProps } from "react";
+import { cn } from "../utils";
 
 export const button = cva(
   [
@@ -39,6 +40,7 @@ export const button = cva(
       size: {
         medium: ["px-2", "py-2"],
         square: ["h-9", "w-9"],
+        small: ["text-sm", "px-2", "py-1"]
       },
       rounded: {
         default: ["rounded-lg"],
@@ -60,7 +62,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonAttributes>(
     return (
       <button
         ref={ref}
-        className={`${button({ intent, size, rounded })} ${className}`}
+        className={cn(button({ intent, size, rounded }), className)}
         {...props}
       />
     );

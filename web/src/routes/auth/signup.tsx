@@ -25,19 +25,18 @@ export function Signup() {
   const [error, setError] = useState<string | null>(null);
 
   const onSubmit: SubmitHandler<Inputs> = async (data) => {
-    await signup(data).then(async (result) => {
-      if (isError(result)) {
-        setError(result.error);
-        return;
-      }
-      const user = await login(data);
-      if (isError(user)) {
-        setError(user.error);
-        return;
-      }
-      updateUser(user);
-      navigate("/");
-    });
+    const result = await signup(data);
+    if (isError(result)) {
+      setError(result.error);
+      return;
+    }
+    const user = await login(data);
+    if (isError(user)) {
+      setError(user.error);
+      return;
+    }
+    updateUser(user);
+    navigate("/");
   };
 
   return (
@@ -90,7 +89,7 @@ export function Signup() {
         ) : null}
         <Button
           intent="primary"
-          className="mt-6 mb-2"
+          className="mt-6"
           disabled={isSubmitting}
           type="submit"
         >
@@ -98,7 +97,9 @@ export function Signup() {
           Sign Up
         </Button>
         {error ? (
-          <p className="text-red-500 font-medium font-display text-center text-sm">{error}</p>
+          <p className="text-red-500 font-medium font-display text-center text-sm">
+            {error}
+          </p>
         ) : null}
       </form>
       <p className="text-black/50 font-display">

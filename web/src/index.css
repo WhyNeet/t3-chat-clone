@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@import "./code.css";
+
 @theme {
   --font-display: "Space Grotesk Variable", var(--font-mono);
   --font-sans: "Geist Variable", var(--font-sans);
@@ -32,4 +34,17 @@ span.size-40 {
 span.size-48 {
   font-size: 48px;
   font-variation-settings: 'OPSZ' 48;
+}
+
+
+.prose pre {
+  @apply p-0 rounded-lg
+}
+
+.prose pre>div {
+  margin: 0 !important;
+}
+
+.prose pre * {
+  font-family: "JetBrains Mono Variable" !important, var(--font-mono);
 }

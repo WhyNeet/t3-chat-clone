@@ -13,6 +13,7 @@ export function ChatsSidebar() {
   );
   const chats = useChatsStore((state) => state.chats);
   const isLoading = useChatsStore(state => state.isFetching);
+  const user = useAuthStore(state => state.user);
 
   return (
     <aside className="min-w-72 rounded-tr-3xl h-[calc(100vh-0.25rem)] absolute right-0 flex flex-col">
@@ -21,7 +22,7 @@ export function ChatsSidebar() {
         Why Chat
       </div>
       <div className="pb-6 px-3 h-full overflow-scroll flex flex-col">
-        {isLoading ? (
+        {user ? isLoading ? (
           <div className="h-full w-full flex items-center justify-center">
             <Loader className="text-pink-900" />
           </div>
@@ -45,7 +46,7 @@ export function ChatsSidebar() {
           </>
         ) : (
           <div>Error.</div>
-        )}
+        ) : <div>logged out</div>}
       </div>
       {isUserLoading ? null : isLoggedIn ? null : (
         <div className="rounded-lg border border-pink-800 bg-pink-50 px-4 py-3 m-2">

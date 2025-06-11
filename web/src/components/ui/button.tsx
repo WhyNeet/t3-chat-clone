@@ -10,8 +10,7 @@ export const button = cva(
     "flex",
     "items-center",
     "justify-center",
-    "gap-2",
-    "disabled:opacity-80"
+    "gap-2"
   ],
   {
     variants: {
@@ -24,7 +23,10 @@ export const button = cva(
           "font-semibold",
           "border-2",
           "border-pink-900",
-          "disabled:hover:bg-pink-500",
+          "disabled:bg-slate-300",
+          "disabled:border-slate-400",
+          "disabled:text-slate-400",
+          "disabled:hover:bg-slate-300",
           "disabled:cursor-not-allowed"
         ],
         ghost: [

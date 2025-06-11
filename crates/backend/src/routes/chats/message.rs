@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use ai::openai::completions::OpenAIMessage;
+use ai::openai::completions::{OpenAICompletionDelta, OpenAIMessage, ReasoningEffort};
 use axum::{
     Json,
     extract::{Path, State},
@@ -25,6 +25,7 @@ use crate::{
 pub struct PromptCompletionPayload {
     pub message: String,
     pub model: String,
+    pub reasoning: Option<ReasoningEffort>,
 }
 
 #[axum::debug_handler]
@@ -77,6 +78,7 @@ pub async fn handler(
     let user_message = ChatMessage {
         id: None,
         content: payload.message.clone(),
+        reasoning: None,
         role: Role::User,
         chat_id: chat.id.unwrap(),
         timestamp: Utc::now(),
@@ -95,24 +97,30 @@ pub async fn handler(
     });
 
     let assistant_message_id = ObjectId::new();
+    let assistant_message = ChatMessage {
+        id: Some(assistant_message_id),
+        content: String::new(),
+        role: Role::Assistant,
+        reasoning: None,
+        chat_id: chat.id.unwrap(),
+        timestamp: Utc::now(),
+    };
     let task_state = Arc::clone(&state);
+    let task_message = assistant_message.clone();
     tokio::spawn(async move {
         task_state
             .database()
             .messages
-            .create(ChatMessage {
-                id: Some(assistant_message_id),
-                content: String::new(),
-                role: Role::Assistant,
-                chat_id: chat.id.unwrap(),
-                timestamp: Utc::now(),
-            })
+            .create(task_message)
             .await
             .unwrap();
     });
 
     let client = state.openrouter().clone();
-    let Ok(stream) = client.completion(payload.model, messages, Some(0.7)).await else {
+    let Ok(stream) = client
+        .completion(payload.model, messages, Some(0.7), payload.reasoning)
+        .await
+    else {
         return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
     };
     tracing::debug!("Created stream.");
@@ -123,28 +131,56 @@ pub async fn handler(
     let (tx, rx) = flume::unbounded();
     let task_state = Arc::clone(&state);
     tokio::spawn(async move {
+        let mut reasoning: Option<String> = None;
         let mut content = String::new();
+
+        let mut reasoning_acc: Option<String> = None;
+        let mut content_acc = String::new();
+        let mut iteration_start = Utc::now().timestamp_millis();
         while let Ok(chunk) = stream.try_next().await {
             let Some(chunk) = chunk else { break };
-            content.push_str(
-                chunk
-                    .choices
-                    .get(0)
-                    .unwrap()
-                    .delta
-                    .content
-                    .as_ref()
-                    .unwrap(),
-            );
-            tx.send_async(ApiDelta::Chunk(chunk)).await.unwrap();
+            let delta = &chunk.choices.get(0).unwrap().delta;
+            let reasoning_content = delta.reasoning.as_ref();
+            let delta_content = delta.content.as_ref().unwrap();
+            if let Some(reasoning_content) = reasoning_content {
+                if let Some(ref mut reasoning) = reasoning {
+                    reasoning.push_str(reasoning_content);
+                } else {
+                    reasoning = Some(reasoning_content.to_string())
+                }
+
+                if reasoning_acc.is_none() {
+                    reasoning_acc = Some(reasoning_content.clone());
+                } else {
+                    reasoning_acc.as_mut().unwrap().push_str(reasoning_content);
+                }
+            }
+            content.push_str(delta_content);
+            content_acc.push_str(delta_content);
+            if Utc::now().timestamp_millis() - iteration_start >= 100 {
+                tx.send_async(ApiDelta::Chunk(OpenAICompletionDelta {
+                    content: Some(content_acc.clone()),
+                    reasoning: reasoning_acc.take(),
+                    role: Some("assistant".to_string()),
+                }))
+                .await
+                .unwrap();
+                content_acc = String::new();
+                iteration_start = Utc::now().timestamp_millis();
+            }
         }
-        tx.send(ApiDelta::Done).unwrap();
+        tx.send(ApiDelta::Done(ChatMessage {
+            content: content.clone(),
+            reasoning: reasoning.clone(),
+            ..assistant_message
+        }))
+        .unwrap();
         task_state
             .database()
             .messages
             .update(
                 assistant_message_id,
-                doc! { "$set": { "content": content } },
+                doc! { "$set": { "content": content, "reasoning": reasoning } },
             )
             .await
             .unwrap();
@@ -166,6 +202,7 @@ pub async fn handler(
             id: user_message_id,
             chat_id: user_message.chat_id,
             content: user_message.content,
+            reasoning: None,
             role: user_message.role,
             timestamp: user_message.timestamp
           }

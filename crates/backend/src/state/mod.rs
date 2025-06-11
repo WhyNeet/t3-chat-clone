@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::data::mongodb::MongoDataAdapter;
-use ai::openai::{completions::OpenAICompletionChunk, streaming::OpenAIClient};
+use ai::openai::{completions::OpenAICompletionDelta, streaming::OpenAIClient};
 use model::{chat::Chat, message::ChatMessage, user::User};
 use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
 use redis_om::redis::aio::MultiplexedConnection;
@@ -100,8 +100,8 @@ impl AppState {
 }
 
 pub enum ApiDelta {
-    Chunk(OpenAICompletionChunk),
-    Done,
+    Chunk(OpenAICompletionDelta),
+    Done(ChatMessage),
 }
 
 pub struct Database {

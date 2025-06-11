@@ -62,5 +62,5 @@ pub async fn handler(
             .into_response();
     }
 
-    ().into_response()
+    (StatusCode::OK, Json(json!({}))).into_response()
 }

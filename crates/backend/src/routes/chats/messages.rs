@@ -64,6 +64,7 @@ pub async fn handler(
                 id: msg.id.unwrap(),
                 content: msg.content,
                 timestamp: chat.timestamp,
+                reasoning: msg.reasoning,
                 chat_id: msg.chat_id,
                 role: msg.role,
             })

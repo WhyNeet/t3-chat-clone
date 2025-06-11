@@ -20,11 +20,11 @@ pub async fn handler(
     };
 
     let stream = recv.into_stream().map(move |delta| match delta {
-        ApiDelta::Chunk(mut chunk) => Event::default().json_data(chunk.choices.remove(0).delta),
-        ApiDelta::Done => {
+        ApiDelta::Chunk(chunk) => Event::default().json_data(chunk),
+        ApiDelta::Done(message) => {
             state.remove_stream(&stream_id);
             tracing::debug!("Streaming finished.");
-            Event::default().json_data(json!({ "control": "done" }))
+            Event::default().json_data(json!({ "control": "done", "message": message }))
         }
     });
 

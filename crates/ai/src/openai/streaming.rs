@@ -5,7 +5,8 @@ use futures::{AsyncBufReadExt, Stream, StreamExt, TryStreamExt};
 use reqwest::Client;
 
 use crate::openai::completions::{
-    OpenAIChatCompletionRequest, OpenAICompletionChunk, OpenAIMessage,
+    OpenAIChatCompletionRequest, OpenAIChatCompletionRequestReasoning, OpenAICompletionChunk,
+    OpenAIMessage, ReasoningEffort,
 };
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,7 @@ impl OpenAIClient {
         model: String,
         messages: Vec<OpenAIMessage>,
         temperature: Option<f32>,
+        reasoning_effort: Option<ReasoningEffort>,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<OpenAICompletionChunk>>> {
         let client = Client::new();
 
@@ -32,6 +34,8 @@ impl OpenAIClient {
             stream: true,
             temperature,
             max_tokens: None,
+            reasoning: reasoning_effort
+                .map(|effort| OpenAIChatCompletionRequestReasoning { effort }),
         };
 
         let request = client

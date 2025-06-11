@@ -9,6 +9,7 @@ pub struct ChatMessage {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
     pub id: Option<ObjectId>,
     pub content: String,
+    pub reasoning: Option<String>,
     pub role: Role,
     pub chat_id: ObjectId,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]

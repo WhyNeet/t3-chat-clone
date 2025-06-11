@@ -9,6 +9,13 @@ pub struct OpenAIChatCompletionRequest {
     pub temperature: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<OpenAIChatCompletionRequestReasoning>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenAIChatCompletionRequestReasoning {
+    pub effort: ReasoningEffort,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,5 +46,17 @@ pub struct OpenAICompletionDelta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ReasoningEffort {
+    #[serde(rename = "high")]
+    High,
+    #[serde(rename = "medium")]
+    Medium,
+    #[serde(rename = "low")]
+    Low,
 }

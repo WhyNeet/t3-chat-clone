@@ -3,7 +3,10 @@ use std::{env, process, sync::Arc};
 use ai::openai::streaming::OpenAIClient;
 use axum::Router;
 
-use backend::{logger::Logger, middleware::auth::AuthMiddlewareLayer, routes, state::AppState};
+use backend::{
+    logger::Logger, middleware::auth::AuthMiddlewareLayer, routes, search::WebSearch,
+    state::AppState,
+};
 use mongodb::{Client, options::ClientOptions};
 use tower_http::cors::CorsLayer;
 
@@ -33,7 +36,8 @@ async fn main() {
         .as_bytes()
         .to_vec()
         .into_boxed_slice();
-    let app_state = AppState::new(openrouter, mongodb, redis, session_key)
+    let web_search = WebSearch::new(env::var("SERPER_KEY").expect("Missing OpenRouter API key"));
+    let app_state = AppState::new(openrouter, mongodb, redis, session_key, web_search)
         .await
         .unwrap();
     let app_state = Arc::new(app_state);

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::data::mongodb::MongoDataAdapter;
+use crate::{config::ModelsConfig, data::mongodb::MongoDataAdapter, search::WebSearch};
 use ai::openai::{completions::OpenAICompletionDelta, streaming::OpenAIClient};
 use model::{chat::Chat, message::ChatMessage, user::User};
 use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
@@ -16,6 +16,8 @@ pub struct AppState {
     database: Database,
     redis: MultiplexedConnection,
     hmac_key: Box<[u8]>,
+    models: ModelsConfig,
+    search: WebSearch,
 }
 
 impl AppState {
@@ -24,6 +26,7 @@ impl AppState {
         client: Client,
         redis: redis_om::Client,
         hmac_key: Box<[u8]>,
+        search: WebSearch,
     ) -> anyhow::Result<Self> {
         client.database("chat").create_collection("users").await?;
         client
@@ -67,6 +70,8 @@ impl AppState {
             },
             redis: conn,
             hmac_key,
+            models: ModelsConfig::new(),
+            search,
         })
     }
 
@@ -96,6 +101,14 @@ impl AppState {
 
     pub fn database(&self) -> &Database {
         &self.database
+    }
+
+    pub fn models(&self) -> &ModelsConfig {
+        &self.models
+    }
+
+    pub fn search(&self) -> &WebSearch {
+        &self.search
     }
 }
 

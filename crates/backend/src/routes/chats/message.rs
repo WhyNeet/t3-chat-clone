@@ -26,6 +26,7 @@ pub struct PromptCompletionPayload {
     pub message: String,
     pub model: String,
     pub reasoning: Option<ReasoningEffort>,
+    pub use_search: bool,
 }
 
 #[axum::debug_handler]
@@ -75,9 +76,41 @@ pub async fn handler(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 
+    let search_results = if payload.use_search {
+        let search_query = payload.message.trim();
+        if payload.message.is_empty() || payload.message.len() > 400 {
+            None
+        } else {
+            state.search().search(search_query.to_string()).await.ok()
+        }
+    } else {
+        None
+    };
+
     let user_message = ChatMessage {
         id: None,
-        content: payload.message.clone(),
+        content: if let Some(results) = search_results {
+            let context: String = results
+                .organic
+                .iter()
+                .take(10)
+                .map(|result| {
+                    format!(
+                        "- {}: {}\n  Source: {}\n",
+                        result.title, result.snippet, result.link
+                    )
+                })
+                .collect();
+
+            format!(
+                "Use the following search results to answer the query. If information is insufficient, state that.\n\n\
+                    Search Results:\n{context}\n\n\
+                    Query: {}\n\nAnswer:",
+                payload.message
+            )
+        } else {
+            payload.message.clone()
+        },
         reasoning: None,
         role: Role::User,
         chat_id: chat.id.unwrap(),
@@ -168,6 +201,15 @@ pub async fn handler(
                 content_acc = String::new();
                 iteration_start = Utc::now().timestamp_millis();
             }
+        }
+        if !content_acc.is_empty() || reasoning_acc.is_some() {
+            tx.send_async(ApiDelta::Chunk(OpenAICompletionDelta {
+                content: Some(content_acc.clone()),
+                reasoning: reasoning_acc.take(),
+                role: Some("assistant".to_string()),
+            }))
+            .await
+            .unwrap();
         }
         tx.send(ApiDelta::Done(ChatMessage {
             content: content.clone(),

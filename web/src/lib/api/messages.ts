@@ -22,7 +22,8 @@ export async function fetchChatMessages(
 export interface SendMessagePayload {
   message: string;
   model: string;
-  reasoning: "high" | "medium" | "low" | null
+  reasoning: "high" | "medium" | "low" | null,
+  use_search: boolean
 }
 
 export async function createMessage(chatId: string, message: SendMessagePayload): Promise<{ stream_id: string, user_message: ChatMessage }> {

@@ -71,6 +71,7 @@ export function Prompt() {
       message,
       model: model.identifier,
       reasoning: isReasoning ? "medium" : null,
+      use_search: false
     });
     if (!newChat) addMessages(chatId, [user_message]);
     setMessage("");

@@ -26,7 +26,7 @@ pub struct PromptCompletionPayload {
     pub message: String,
     pub model: String,
     pub reasoning: Option<ReasoningEffort>,
-    pub use_search: bool,
+    pub use_search: Option<bool>,
 }
 
 #[axum::debug_handler]
@@ -42,6 +42,7 @@ pub async fn handler(
         .get(doc! { "_id": chat_id, "user_id": ObjectId::from_str(&session.user_id).unwrap() })
         .await
     else {
+        tracing::error!("Failed to get chat.");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
     let Some(chat) = chat else {
@@ -55,9 +56,13 @@ pub async fn handler(
     let Ok(messages) = state
         .database()
         .messages
-        .get_many_sorted(doc! { "chat_id": chat.id.unwrap() }, doc! { "index": 1 })
+        .get_many_sorted(
+            doc! { "chat_id": chat.id.unwrap() },
+            doc! { "timestamp": 1 },
+        )
         .await
     else {
+        tracing::error!("Failed to get message.");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 
@@ -73,10 +78,11 @@ pub async fn handler(
         })
         .collect::<Result<Vec<_>, mongodb::error::Error>>()
     else {
+        tracing::error!("Failed to list message.");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 
-    let search_results = if payload.use_search {
+    let search_results = if payload.use_search.is_some() && payload.use_search.unwrap() {
         let search_query = payload.message.trim();
         if payload.message.is_empty() || payload.message.len() > 400 {
             None
@@ -154,6 +160,7 @@ pub async fn handler(
         .completion(payload.model, messages, Some(0.7), payload.reasoning)
         .await
     else {
+        tracing::error!("Failed to get stream.");
         return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
     };
     tracing::debug!("Created stream.");

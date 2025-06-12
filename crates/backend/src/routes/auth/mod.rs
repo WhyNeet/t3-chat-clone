@@ -13,6 +13,7 @@ pub type HmacSha256 = Hmac<Sha256>;
 pub type SessionId = Uuid;
 
 pub mod login;
+pub mod logout;
 pub mod register;
 
 pub fn router() -> Router<Arc<AppState>> {

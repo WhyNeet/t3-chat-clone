@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useState, type ComponentProps } from "react";
+import { forwardRef, useState, type ComponentProps } from "react";
 import { Role, type ChatMessage } from "../lib/model/message";
 import { cn } from "./utils";
 import Markdown from "react-markdown";
@@ -56,9 +56,11 @@ export const Message = forwardRef<
         <Markdown
           components={{
             code(props) {
+              /* @ts-ignore */
               const { children, className, node, ...rest } = props;
               const match = /language-(\w+)/.exec(className || "");
               return match ? (
+                /* @ts-ignore */
                 <SyntaxHighlighter
                   {...rest}
                   PreTag="figure"

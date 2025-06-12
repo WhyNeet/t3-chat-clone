@@ -34,7 +34,7 @@ export type ChatState =
 export interface ChatStore {
   chats: Record<
     string,
-    { chat: Chat; state: ChatState; messages: ChatMessage[]; streaming: bool }
+    { chat: Chat; state: ChatState; messages: ChatMessage[]; streaming: boolean }
   >; // id -> ChatState
   pendingMessages: Record<
     string,

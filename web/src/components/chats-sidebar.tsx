@@ -35,7 +35,7 @@ export function ChatsSidebar() {
                 </Button>
               </NavLink>
               <div className="flex flex-col-reverse">
-                {Object.values(chats).map(({ chat, streaming }) => (
+                {Object.values(chats).reverse().map(({ chat, streaming }) => (
                   <NavLink
                     key={chat.id}
                     to={`/chat/${chat.id}`}

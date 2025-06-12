@@ -50,7 +50,7 @@ export interface ChatStore {
   setChatMessages: (id: string, messages: ChatMessage[]) => void;
   setChatState: (id: string, state: ChatState) => void;
   clearPendingMessage: (id: string) => void;
-  initializeChat: (chat: Chat) => void;
+  initializeChat: (chat: Chat, messages?: ChatMessage[]) => void;
 }
 
 export const useChatsStore = create<ChatStore>((set) => ({
@@ -58,16 +58,16 @@ export const useChatsStore = create<ChatStore>((set) => ({
   pendingMessages: {},
   isFetching: true,
   finishFetching: () => set({ isFetching: false }),
-  initializeChat: (chat) => {
+  initializeChat: (chat, messages) => {
     set((state) => ({
       chats: {
-        ...state.chats,
         [chat.id]: {
           chat,
-          state: { status: "idle" },
-          messages: [],
+          state: { status: messages ? "success" : "idle" },
+          messages: messages ?? [],
           streaming: false,
         },
+        ...state.chats,
       },
       pendingMessages: { ...state.pendingMessages, [chat.id]: null },
     }));
@@ -96,9 +96,7 @@ export const useChatsStore = create<ChatStore>((set) => ({
             ...currentChatState,
             messages: [
               ...messages,
-              ...(currentChatState.state.status === "success"
-                ? currentChatState.messages
-                : []),
+              ...currentChatState.messages,
             ],
           },
         },

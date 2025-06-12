@@ -24,6 +24,7 @@ export function Prompt() {
   );
   const addMessages = useChatsStore((state) => state.addChatMessages);
   const addChat = useChatsStore((state) => state.initializeChat);
+  const setChatState = useChatsStore(state => state.setChatState)
   const params = useParams();
   const chatId = params["chatId"];
   const [isRequesting, setIsRequesting] = useState(false);
@@ -53,9 +54,10 @@ export function Prompt() {
     setIsRequesting(true);
     if (!chatId) {
       const chat = await createChat();
-      addChat(chat);
+      addChat(chat, []);
+      localStorage.setItem(`chat-model-${chat.id}`, selectedModel.identifier);
       navigate(`/chat/${chat.id}`);
-      await sendAndSubscribe(chat.id, selectedModel, true);
+      await sendAndSubscribe(chat.id, selectedModel);
     } else {
       navigate(`/chat/${chatId}`);
       await sendAndSubscribe(chatId, selectedModel);
@@ -65,7 +67,6 @@ export function Prompt() {
   const sendAndSubscribe = async (
     chatId: string,
     model: Model,
-    newChat = false,
   ) => {
     const { stream_id, user_message } = await createMessage(chatId, {
       message,
@@ -73,7 +74,7 @@ export function Prompt() {
       reasoning: isReasoning ? "medium" : null,
       use_search: false
     });
-    if (!newChat) addMessages(chatId, [user_message]);
+    addMessages(chatId, [user_message]);
     setMessage("");
     localStorage.setItem(`stream-${chatId}`, stream_id);
     setIsRequesting(false);
@@ -101,6 +102,7 @@ export function Prompt() {
         localStorage.removeItem(`streaming-message-reasoning-${chatId}`);
         clearPendingMessage(chatId);
         addMessages(chatId, [message]);
+        setChatState(chatId, { status: "success" });
       },
     );
   };

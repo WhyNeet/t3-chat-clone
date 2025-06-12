@@ -13,7 +13,7 @@ export function init() {
 
   const { updateUser } = useAuthStore.getState();
 
-  const { initializeChat, finishFetching, updatePendingMessage } =
+  const { initializeChat, finishFetching, updatePendingMessage, clearPendingMessage, addChatMessages } =
     useChatsStore.getState();
   useAuthStore.subscribe((store, prev) => {
     if (store.user && !prev.user) {
@@ -51,12 +51,12 @@ export function init() {
                   ) ?? "") + (delta.reasoning ?? ""),
                 );
               },
-              () => {
+              (message) => {
                 localStorage.removeItem(`stream-${chat.id}`);
                 localStorage.removeItem(`streaming-message-${chat.id}`);
-                localStorage.removeItem(
-                  `streaming-message-reasoning-${chat.id}`,
-                );
+                localStorage.removeItem(`streaming-message-reasoning-${chat.id}`);
+                clearPendingMessage(chat.id);
+                addChatMessages(chat.id, [message]);
               },
             );
           }

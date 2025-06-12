@@ -5,6 +5,7 @@ import { isError } from "../../lib/api/error";
 import { Role } from "../../lib/model/message";
 import { Message } from "../../components/message";
 import { useChatsStore } from "../../lib/state/chats";
+import { Loader } from "../../components/ui/loader";
 
 export function Chat() {
   const scrollWrapper = useRef<HTMLDivElement>(null);
@@ -21,8 +22,10 @@ export function Chat() {
   );
   const setMessages = useChatsStore((state) => state.setChatMessages);
   const setChatState = useChatsStore((state) => state.setChatState);
-  const pendingMessage = useChatsStore(state => state.pendingMessages[chatId]);
-  const [isLoading, setIsLoading] = useState(true);
+  const pendingMessage = useChatsStore(
+    (state) => state.pendingMessages[chatId],
+  );
+  // const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,8 +40,8 @@ export function Chat() {
     if (!scrollWrapper.current || !scrollableContainer.current) return;
     if (
       scrollableContainer.current.getBoundingClientRect().height -
-      scrollWrapper.current.scrollTop >
-      120
+      scrollWrapper.current.scrollTop - window.innerHeight + 300 >
+      220
     )
       return;
     scrollWrapper.current.scrollTo({
@@ -49,12 +52,12 @@ export function Chat() {
 
   useEffect(() => {
     if (!chatLoading && !messages) {
+      // setIsLoading(true);
       setChatState(chatId, { status: "loading" });
       fetchChatMessages(chatId, {
         start: 0,
         take: window.innerHeight / 100,
       }).then((result) => {
-        setIsLoading(false);
         if (isError(result)) {
           setChatState(chatId, { status: "error", error: result.error });
           setError(result.error);
@@ -62,9 +65,10 @@ export function Chat() {
         }
         setChatState(chatId, { status: "success" });
         setMessages(chatId, result);
+        // setIsLoading(false);
       });
     } else {
-      setIsLoading(false);
+      // setIsLoading(false);
     }
   }, [messages, chatId, setMessages, setChatState, chatLoading]);
 
@@ -73,7 +77,12 @@ export function Chat() {
       className="w-full h-full overflow-y-scroll p-6 pb-32 overscroll-contain"
       ref={scrollWrapper}
     >
-      {isLoading ? "loading" : null}
+      {chatLoading ? (
+        <div className="h-full w-full flex items-center justify-center gap-2">
+          <Loader className="text-pink-600 h-5 w-5" />
+          <p className="text-sm font-medium font-display">Loading chat...</p>
+        </div>
+      ) : null}
       {error ? `error: ${error}` : null}
       <div
         className="max-w-4xl flex flex-col-reverse mx-auto"
@@ -92,9 +101,13 @@ export function Chat() {
           />
         ) : null}
         {messages
-          ? messages.map((message) => (
-            <Message key={message.id} message={message} />
-          ))
+          ? messages
+            .filter(
+              (message) =>
+                message.content.length !== 0 ||
+                (message.reasoning && message.reasoning.length !== 0),
+            )
+            .map((message) => <Message key={message.id} message={message} />)
           : null}
       </div>
     </div>

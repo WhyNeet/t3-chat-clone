@@ -6,7 +6,7 @@ import { Outlet } from "react-router";
 import { Prompt } from "../components/prompt";
 
 export function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(Boolean(Number(localStorage.getItem("sidebar-open") ?? 0)));
+  const [sidebarOpen, setSidebarOpen] = useState(Boolean(Number(localStorage.getItem("sidebar-open") ?? 1)));
   const viewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

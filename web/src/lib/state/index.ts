@@ -1,13 +1,19 @@
 import { me } from "../api/auth";
 import { chats } from "../api/chats";
 import { subscribeToStream } from "../api/completions";
+import { listModels } from "../api/service";
 import { useAuthStore } from "./auth";
 import { useChatsStore } from "./chats";
+import { useServiceStore } from "./service";
 
 export function init() {
+  const { setModels } = useServiceStore.getState();
+
+  listModels().then((models) => setModels(models));
+
   const { updateUser } = useAuthStore.getState();
 
-  const { initializeChat, finishFetching, updatePendingMessage, pendingMessages } =
+  const { initializeChat, finishFetching, updatePendingMessage } =
     useChatsStore.getState();
   useAuthStore.subscribe((store, prev) => {
     if (store.user && !prev.user) {
@@ -21,10 +27,10 @@ export function init() {
           if (streamId) {
             const message = localStorage.getItem(
               `streaming-message-${chat.id}`,
-            )!;
+            ) ?? "";
             const reasoning = localStorage.getItem(
               `streaming-message-reasoning-${chat.id}`,
-            )!;
+            ) ?? "";
             updatePendingMessage(chat.id, { content: message, reasoning });
             subscribeToStream(
               streamId,
@@ -35,17 +41,22 @@ export function init() {
                 });
                 localStorage.setItem(
                   `streaming-message-${chat.id}`,
-                  (localStorage.getItem(`streaming-message-${chat.id}`) ?? "") + delta.content,
+                  (localStorage.getItem(`streaming-message-${chat.id}`) ?? "") +
+                  delta.content,
                 );
                 localStorage.setItem(
                   `streaming-message-reasoning-${chat.id}`,
-                  (localStorage.getItem(`streaming-message-reasoning-${chat.id}`) ?? "") + (delta.reasoning ?? ""),
+                  (localStorage.getItem(
+                    `streaming-message-reasoning-${chat.id}`,
+                  ) ?? "") + (delta.reasoning ?? ""),
                 );
               },
               () => {
                 localStorage.removeItem(`stream-${chat.id}`);
                 localStorage.removeItem(`streaming-message-${chat.id}`);
-                localStorage.removeItem(`streaming-message-reasoning-${chat.id}`);
+                localStorage.removeItem(
+                  `streaming-message-reasoning-${chat.id}`,
+                );
               },
             );
           }

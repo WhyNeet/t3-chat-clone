@@ -32,7 +32,10 @@ export type ChatState =
   | { status: "error"; error: string };
 
 export interface ChatStore {
-  chats: Record<string, { chat: Chat; state: ChatState, messages: ChatMessage[] }>; // id -> ChatState
+  chats: Record<
+    string,
+    { chat: Chat; state: ChatState; messages: ChatMessage[]; streaming: bool }
+  >; // id -> ChatState
   pendingMessages: Record<
     string,
     { content: string; reasoning: string | null } | null
@@ -57,7 +60,15 @@ export const useChatsStore = create<ChatStore>((set) => ({
   finishFetching: () => set({ isFetching: false }),
   initializeChat: (chat) => {
     set((state) => ({
-      chats: { ...state.chats, [chat.id]: { chat, state: { status: "idle" }, messages: [] } },
+      chats: {
+        ...state.chats,
+        [chat.id]: {
+          chat,
+          state: { status: "idle" },
+          messages: [],
+          streaming: false,
+        },
+      },
       pendingMessages: { ...state.pendingMessages, [chat.id]: null },
     }));
   },
@@ -114,6 +125,13 @@ export const useChatsStore = create<ChatStore>((set) => ({
             reasoning,
           },
         },
+        chats: {
+          ...state.chats,
+          [id]: {
+            ...state.chats[id],
+            streaming: true,
+          },
+        },
       };
     });
   },
@@ -122,6 +140,13 @@ export const useChatsStore = create<ChatStore>((set) => ({
       pendingMessages: {
         ...state.pendingMessages,
         [id]: null,
+      },
+      chats: {
+        ...state.chats,
+        [id]: {
+          ...state.chats[id],
+          streaming: false,
+        },
       },
     }));
   },

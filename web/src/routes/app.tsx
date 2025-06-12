@@ -6,10 +6,12 @@ import { Outlet } from "react-router";
 import { Prompt } from "../components/prompt";
 
 export function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(JSON.parse(localStorage.getItem("sidebar-open") ?? "true"));
   const viewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    localStorage.setItem("sidebar-open", JSON.stringify(sidebarOpen))
+
     if (!viewRef.current) return;
     viewRef.current.classList.add("transition-all!");
     const id = setTimeout(() => {

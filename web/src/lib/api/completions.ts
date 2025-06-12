@@ -1,10 +1,21 @@
 import { BACKEND_URI } from "../constants";
 import type { ChatMessage } from "../model/message";
 
-export function subscribeToStream(streamId: string, callback: (delta: OpenAICompletionDelta) => void, close?: (message: ChatMessage) => void) {
+export function subscribeToStream(
+  streamId: string,
+  callback: (delta: OpenAICompletionDelta) => void,
+  close?: (message: ChatMessage) => void,
+) {
   const events = new EventSource(
     `${BACKEND_URI}/completions/prompt/sse/${streamId}`,
   );
+
+  let retries = 0;
+
+  events.addEventListener("error", () => {
+    retries += 1;
+    if (retries > 3) events.close();
+  });
 
   events.addEventListener("message", (message: MessageEvent<string>) => {
     const data: CompletionData = JSON.parse(message.data);

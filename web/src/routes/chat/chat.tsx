@@ -17,6 +17,8 @@ export function Chat() {
       ? state.chats[chatId].messages
       : null,
   );
+  const chatExists = useChatsStore(state => state.chats[chatId] !== undefined)
+  const hasPendingMessage = useRef(false);
   const chatLoading = useChatsStore(
     (state) => state.chats[chatId]?.state.status === "loading",
   );
@@ -41,16 +43,20 @@ export function Chat() {
     if (
       scrollableContainer.current.getBoundingClientRect().height -
       scrollWrapper.current.scrollTop - window.innerHeight + 300 >
-      220
+      220 || hasPendingMessage.current === false && scrollableContainer.current.getBoundingClientRect().height -
+      scrollWrapper.current.scrollTop - window.innerHeight + 300 >
+      0
     )
       return;
     scrollWrapper.current.scrollTo({
       top: scrollableContainer.current.clientHeight,
       behavior: "instant",
     });
+    hasPendingMessage.current = pendingMessage !== null;
   }, [pendingMessage]);
 
   useEffect(() => {
+    if (!chatId || !chatExists) return;
     if (!chatLoading && !messages) {
       // setIsLoading(true);
       setChatState(chatId, { status: "loading" });
@@ -70,7 +76,7 @@ export function Chat() {
     } else {
       // setIsLoading(false);
     }
-  }, [messages, chatId, setMessages, setChatState, chatLoading]);
+  }, [messages, chatId, setMessages, setChatState, chatLoading, chatExists]);
 
   return (
     <div
@@ -93,6 +99,7 @@ export function Chat() {
             message={{
               chat_id: chatId,
               content: pendingMessage.content,
+              model: pendingMessage.model,
               reasoning: pendingMessage.reasoning,
               id: "pending-message",
               role: Role.Assistant,

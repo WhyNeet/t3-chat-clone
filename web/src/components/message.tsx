@@ -14,12 +14,13 @@ export const Message = forwardRef<
   return (
     <div
       className={cn(
-        `mb-2 p-4 border border-transparent hover:border-pink-950 rounded-lg ${message.role === Role.User ? "self-end" : ""}`,
+        `mb-2 p-4 border border-transparent relative hover:border-pink-950 rounded-lg ${message.role === Role.User ? "self-end" : ""}`,
         className,
       )}
       {...props}
       ref={ref}
     >
+      {message.model ? <div className="absolute px-2 py-1 rounded-lg bg-white h-8 -bottom-4 left-4 text-sm border border-pink-900/10 font-display text-pink-900/80">{message.model}</div> : null}
       {message.reasoning ? (
         <div
           className={cn(

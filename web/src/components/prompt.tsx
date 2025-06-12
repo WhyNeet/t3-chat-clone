@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "../components/ui/button";
-import { Brain, ChevronDownIcon, Command, SendHorizonal } from "lucide-react";
+import { Brain, ChevronDownIcon, Command, Globe, SendHorizonal } from "lucide-react";
 import { useParams } from "react-router";
 import { createMessage } from "../lib/api/messages";
 import { subscribeToStream } from "../lib/api/completions";
@@ -16,6 +16,9 @@ import type { Model } from "../lib/model/service";
 export function Prompt() {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
+  const initPendingMessage = useChatsStore(
+    (state) => state.initPendingMessage,
+  );
   const updatePendingMessage = useChatsStore(
     (state) => state.updatePendingMessage,
   );
@@ -32,6 +35,7 @@ export function Prompt() {
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isReasoning, setIsReasoning] = useState(false);
   const [selectedModel, setSelectedModel] = useState<Model>(null!);
+  const [useSearch, setUseSearch] = useState(false);
 
   useEffect(() => {
     if (models) {
@@ -72,12 +76,13 @@ export function Prompt() {
       message,
       model: model.identifier,
       reasoning: isReasoning ? "medium" : null,
-      use_search: false
+      use_search: useSearch
     });
     addMessages(chatId, [user_message]);
     setMessage("");
     localStorage.setItem(`stream-${chatId}`, stream_id);
     setIsRequesting(false);
+    initPendingMessage(chatId, model.name);
     subscribeToStream(
       stream_id,
       (delta) => {
@@ -179,6 +184,18 @@ export function Prompt() {
                 Reasoning
               </Button>
             ) : null}
+            <Button
+              onClick={() => setUseSearch((prev) => !prev)}
+              intent="ghost"
+              size="small"
+              className={cn(
+                "gap-1.5 border-pink-900/20 border rounded-full text-pink-900 transition",
+                useSearch ? "hover:bg-pink-900/10 bg-pink-800/10" : "",
+              )}
+            >
+              <Globe className="h-4 w-4" />
+              Web Search
+            </Button>
           </>
         ) : null}
       </div>

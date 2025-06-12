@@ -1,6 +1,7 @@
 export interface ChatMessage {
   id: string;
   content: string;
+  model: string | null;
   reasoning: string | null;
   role: Role;
   chat_id: string;

@@ -38,11 +38,15 @@ export interface ChatStore {
   >; // id -> ChatState
   pendingMessages: Record<
     string,
-    { content: string; reasoning: string | null } | null
+    { content: string; reasoning: string | null, model: string } | null
   >; // id -> pending message string
   isFetching: boolean;
   finishFetching: () => void;
   addChatMessages: (id: string, messages: ChatMessage[]) => void;
+  initPendingMessage: (
+    id: string,
+    model: string
+  ) => void;
   updatePendingMessage: (
     id: string,
     delta: { content: string | null; reasoning: string | null },
@@ -103,31 +107,40 @@ export const useChatsStore = create<ChatStore>((set) => ({
       };
     });
   },
+  initPendingMessage: (id, model) => {
+    set(state => ({
+      pendingMessages: {
+        ...state.pendingMessages,
+        [id]: {
+          model,
+          content: "",
+          reasoning: null,
+        },
+      },
+      chats: {
+        ...state.chats,
+        [id]: {
+          ...state.chats[id],
+          streaming: true,
+        },
+      },
+    }))
+  },
   updatePendingMessage: (id, delta) => {
     set((state) => {
-      let reasoning = delta.content
-        ? (state.pendingMessages[id]?.reasoning ?? null)
-        : (state.pendingMessages[id]?.reasoning ?? "");
-      if (reasoning) {
-        if (delta.reasoning) reasoning += delta.reasoning;
-      } else {
-        if (delta.reasoning) reasoning += delta.reasoning;
-      }
+      let reasoning = delta.reasoning
+        ? (state.pendingMessages[id]!.reasoning ?? "")
+        : (state.pendingMessages[id]!.reasoning ?? null);
+      if (delta.reasoning) reasoning += delta.reasoning;
       return {
         pendingMessages: {
           ...state.pendingMessages,
           [id]: {
+            ...state.pendingMessages[id]!,
             content:
-              (state.pendingMessages[id]?.content ?? "") +
+              state.pendingMessages[id]!.content +
               (delta.content ?? ""),
             reasoning,
-          },
-        },
-        chats: {
-          ...state.chats,
-          [id]: {
-            ...state.chats[id],
-            streaming: true,
           },
         },
       };

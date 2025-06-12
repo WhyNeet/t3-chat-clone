@@ -35,26 +35,28 @@ export function ChatsSidebar() {
                 </Button>
               </NavLink>
               <div className="flex flex-col-reverse">
-                {Object.values(chats).reverse().map(({ chat, streaming }) => (
-                  <NavLink
-                    key={chat.id}
-                    to={`/chat/${chat.id}`}
-                    className={({ isActive }) =>
-                      `w-full rounded-lg border-2 border-transparent px-4 py-2 font-medium font-display group flex items-center justify-between ${isActive ? "border-pink-800 bg-pink-50" : ""}`
-                    }
-                  >
-                    {chat.name ?? "New Chat"}
-                    <div className="flex items-center gap-2">
-                      {streaming ? (
-                        <Loader className="h-5 w-5 text-pink-900" />
-                      ) : (
-                        <div className="hidden group-hover:block">
-                          <Ellipsis className="h-6 w-6 stroke-2" />
-                        </div>
-                      )}
-                    </div>
-                  </NavLink>
-                ))}
+                {Object.values(chats)
+                  .reverse()
+                  .map(({ chat, streaming }) => (
+                    <NavLink
+                      key={chat?.id}
+                      to={`/chat/${chat?.id}`}
+                      className={({ isActive }) =>
+                        `w-full rounded-lg border-2 border-transparent px-4 py-2 font-medium font-display group flex items-center justify-between ${isActive ? "border-pink-800 bg-pink-50" : ""}`
+                      }
+                    >
+                      {chat?.name ?? "New Chat"}
+                      <div className="flex items-center gap-2">
+                        {streaming ? (
+                          <Loader className="h-5 w-5 text-pink-900" />
+                        ) : (
+                          <div className="hidden group-hover:block">
+                            <Ellipsis className="h-6 w-6 stroke-2" />
+                          </div>
+                        )}
+                      </div>
+                    </NavLink>
+                  ))}
               </div>
             </>
           ) : (
@@ -71,7 +73,8 @@ export function ChatsSidebar() {
       {isUserLoading ? null : isLoggedIn ? null : (
         <div className="rounded-lg border border-pink-800 bg-pink-50 px-4 py-3 m-2">
           <p className="font-display text-sm mb-3 text-pink-900">
-            Log in to access all features of Why&nbsp;Chat.
+            Log in to access all features of Why&nbsp;Chat.{" "}
+            {isNotChrome() ? "Only tested in Chrome." : null}
           </p>
           <NavLink to="/auth/login">
             <Button intent="primary" className="w-full">
@@ -83,3 +86,10 @@ export function ChatsSidebar() {
     </aside>
   );
 }
+
+const isNotChrome = () => {
+  return (
+    !navigator.userAgent.includes("Chrome/") &&
+    !navigator.userAgent.includes("Chromium/")
+  );
+};

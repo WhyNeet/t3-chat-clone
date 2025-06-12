@@ -18,6 +18,7 @@ pub struct ChatMessagePayload {
     #[serde(serialize_with = "super::serialize_oid")]
     pub id: ObjectId,
     pub content: String,
+    pub model: Option<String>,
     pub reasoning: Option<String>,
     pub role: Role,
     #[serde(serialize_with = "super::serialize_oid")]

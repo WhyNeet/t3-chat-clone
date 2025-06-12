@@ -44,10 +44,10 @@ pub struct SerperRequest {
 #[derive(Debug, Deserialize)]
 pub struct SerperResult {
     pub organic: Vec<OrganicResult>,
-    #[serde(rename = "topStories")]
-    pub top_stories: Vec<Story>,
-    #[serde(rename = "peopleAlsoAsk")]
-    pub people_ask: Vec<PeopleQuestion>,
+    // #[serde(rename = "topStories")]
+    // pub top_stories: Option<Vec<Story>>,
+    // #[serde(rename = "peopleAlsoAsk")]
+    // pub people_ask: Vec<PeopleQuestion>,
 }
 
 #[derive(Debug, Deserialize)]

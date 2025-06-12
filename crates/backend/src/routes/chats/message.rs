@@ -26,7 +26,7 @@ pub struct PromptCompletionPayload {
     pub message: String,
     pub model: String,
     pub reasoning: Option<ReasoningEffort>,
-    pub use_search: Option<bool>,
+    pub use_search: bool,
 }
 
 #[axum::debug_handler]
@@ -36,6 +36,19 @@ pub async fn handler(
     Auth(session): Auth,
     Json(payload): Json<PromptCompletionPayload>,
 ) -> impl IntoResponse {
+    let Some(model) = state
+        .models()
+        .free_models()
+        .iter()
+        .find(|model| model.identifier == payload.model)
+    else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Model does not exist." })),
+        )
+            .into_response();
+    };
+
     let Ok(chat) = state
         .database()
         .chats
@@ -82,9 +95,9 @@ pub async fn handler(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 
-    let search_results = if payload.use_search.is_some() && payload.use_search.unwrap() {
+    let search_results = if payload.use_search {
         let search_query = payload.message.trim();
-        if payload.message.is_empty() || payload.message.len() > 400 {
+        if search_query.is_empty() || search_query.len() > 400 {
             None
         } else {
             state.search().search(search_query.to_string()).await.ok()
@@ -95,32 +108,36 @@ pub async fn handler(
 
     let user_message = ChatMessage {
         id: None,
-        content: if let Some(results) = search_results {
-            let context: String = results
-                .organic
-                .iter()
-                .take(10)
-                .map(|result| {
-                    format!(
-                        "- {}: {}\n  Source: {}\n",
-                        result.title, result.snippet, result.link
-                    )
-                })
-                .collect();
-
-            format!(
-                "Use the following search results to answer the query. If information is insufficient, state that.\n\n\
-                    Search Results:\n{context}\n\n\
-                    Query: {}\n\nAnswer:",
-                payload.message
-            )
-        } else {
-            payload.message.clone()
-        },
+        content: payload.message.clone(),
+        model: None,
         reasoning: None,
         role: Role::User,
         chat_id: chat.id.unwrap(),
         timestamp: Utc::now(),
+    };
+
+    let message_for_assistant = if let Some(results) = search_results {
+        let context: String = results
+            .organic
+            .iter()
+            .take(10)
+            .map(|result| {
+                format!(
+                    " - Title: {};\nSnippet: {};\nSource: {};\n",
+                    result.title, result.snippet, result.link
+                )
+            })
+            .collect();
+
+        format!(
+            r#"Use the following search results to answer the query. If information is insufficient, state that.;
+            Search Results:\n{context};
+            Query: {};
+            \nAnswer:"#,
+            user_message.content.trim()
+        )
+    } else {
+        user_message.content.clone()
     };
 
     let user_message_id = state
@@ -132,13 +149,14 @@ pub async fn handler(
 
     messages.push(OpenAIMessage {
         role: "user".to_string(),
-        content: payload.message,
+        content: message_for_assistant,
     });
 
     let assistant_message_id = ObjectId::new();
     let assistant_message = ChatMessage {
         id: Some(assistant_message_id),
         content: String::new(),
+        model: Some(model.name.clone()),
         role: Role::Assistant,
         reasoning: None,
         chat_id: chat.id.unwrap(),
@@ -251,6 +269,7 @@ pub async fn handler(
             id: user_message_id,
             chat_id: user_message.chat_id,
             content: user_message.content,
+            model: None,
             reasoning: None,
             role: user_message.role,
             timestamp: user_message.timestamp

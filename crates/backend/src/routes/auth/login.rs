@@ -92,6 +92,7 @@ pub async fn handler(
     let cookie = Cookie::build((SESSION_ID_COOKIE_NAME, format!("{session_id}.{signature}")))
         .path("/")
         .same_site(SameSite::None)
+        .secure(true)
         .http_only(true)
         .max_age(Duration::seconds(SESSION_EXPIRATION as i64))
         .build();

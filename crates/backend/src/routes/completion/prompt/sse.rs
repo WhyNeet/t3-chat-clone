@@ -9,7 +9,10 @@ use futures::StreamExt;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::state::{ApiDelta, AppState};
+use crate::{
+    payload::chat::ChatMessagePayload,
+    state::{ApiDelta, AppState},
+};
 
 pub async fn handler(
     Path(stream_id): Path<Uuid>,
@@ -24,7 +27,15 @@ pub async fn handler(
         ApiDelta::Done(message) => {
             state.remove_stream(&stream_id);
             tracing::debug!("Streaming finished.");
-            Event::default().json_data(json!({ "control": "done", "message": message }))
+            Event::default().json_data(json!({ "control": "done", "message": ChatMessagePayload {
+              id: message.id.unwrap(),
+              chat_id: message.chat_id,
+              content: message.content,
+              model: message.model,
+              reasoning: None,
+              role: message.role,
+              timestamp: message.timestamp
+            } }))
         }
     });
 

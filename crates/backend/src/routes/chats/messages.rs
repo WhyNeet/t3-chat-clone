@@ -63,6 +63,7 @@ pub async fn handler(
             message.map(|msg| ChatMessagePayload {
                 id: msg.id.unwrap(),
                 content: msg.content,
+                model: msg.model,
                 timestamp: chat.timestamp,
                 reasoning: msg.reasoning,
                 chat_id: msg.chat_id,

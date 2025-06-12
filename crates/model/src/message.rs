@@ -12,6 +12,7 @@ pub struct ChatMessage {
     pub reasoning: Option<String>,
     pub role: Role,
     pub chat_id: ObjectId,
+    pub model: Option<String>,
     #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     pub timestamp: chrono::DateTime<Utc>,
 }

@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "../components/ui/button";
-import { ChatsSidebar } from "../components/chats-sidebar";
+import { ChatsSidebar, useSidebarStore } from "../components/chats-sidebar";
 import { ChevronRight } from "lucide-react";
 import { Outlet } from "react-router";
-import { Prompt } from "../components/prompt";
 import { cn } from "../components/utils";
 
 export function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(Boolean(Number(localStorage.getItem("sidebar-open") ?? 1)));
+  const { isOpen: sidebarOpen, toggle, setIsOpen: setSidebarOpen } = useSidebarStore();
   const viewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,11 +32,11 @@ export function App() {
       <div onClick={() => setSidebarOpen(false)} className={cn("md:hidden bg-pink-950/30 absolute inset-0 z-20 transition-all", sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none")}></div>
       <div
         ref={viewRef}
-        className={`h-full bg-white transition-none duration-200 ${sidebarOpen ? "md:rounded-tl-3xl w-screen md:w-[calc(100vw-288px)]" : "w-full"} relative`}
+        className={`h-full bg-white transition-none duration-200 overflow-hidden ${sidebarOpen ? "md:rounded-tl-3xl w-screen md:w-[calc(100vw-288px)]" : "w-full"} relative`}
       >
         <div className="fixed top-3 left-3 z-50">
           <Button
-            onClick={() => setSidebarOpen((prev) => !prev)}
+            onClick={toggle}
             intent="ghost"
             size="square"
             rounded="circle"
@@ -49,9 +48,6 @@ export function App() {
           </Button>
         </div>
         <Outlet />
-        <div className="absolute bottom-0 flex justify-center inset-x-0 px-1 md:px-5 lg:px-10">
-          <Prompt />
-        </div>
       </div>
     </div>
   );

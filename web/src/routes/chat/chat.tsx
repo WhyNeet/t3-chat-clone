@@ -8,6 +8,8 @@ import { useChatsStore } from "../../lib/state/chats";
 import { Loader } from "../../components/ui/loader";
 import { AlertCircle, CircleAlert, Globe, Sparkle } from "lucide-react";
 import { useServiceStore } from "../../lib/state/service";
+import { Prompt } from "../../components/prompt";
+import { useLocation } from "react-router";
 
 export function Chat() {
   const scrollWrapper = useRef<HTMLDivElement>(null);
@@ -41,20 +43,36 @@ export function Chat() {
   const [batchLoadError, setBatchLoadError] = useState<string | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const batchLoadingInternal = useRef(false);
-  const inferenceError: number | null = useServiceStore(state => state.inferenceError["openrouter"] ?? null);
+  const inferenceError: number | null = useServiceStore(
+    (state) => state.inferenceError["openrouter"] ?? null,
+  );
+  const location = useLocation();
 
   useEffect(() => {
     if (!scrollWrapper.current || !scrollableContainer.current) return;
-    if (!chatLoading) scrollWrapper.current.scrollTo({
+    if (!chatLoading)
+      scrollWrapper.current.scrollTo({
+        top: scrollableContainer.current.clientHeight,
+        behavior: "instant",
+      });
+  }, [chatLoading]);
+
+  useEffect(() => {
+    if (!scrollWrapper.current || !scrollableContainer.current) return;
+    scrollWrapper.current.scrollTo({
       top: scrollableContainer.current.clientHeight,
       behavior: "instant",
     });
-  }, [chatLoading])
+  }, [location]);
 
   useEffect(() => {
     if (!scrollWrapper.current || !scrollableContainer.current) return;
-    if (scrollableContainer.current!.getBoundingClientRect().height -
-      scrollWrapper.current!.scrollTop - scrollWrapper.current!.getBoundingClientRect().height < 0)
+    if (
+      scrollableContainer.current!.getBoundingClientRect().height -
+      scrollWrapper.current!.scrollTop -
+      scrollWrapper.current!.getBoundingClientRect().height <
+      0
+    )
       scrollWrapper.current.scrollTo({
         top: scrollableContainer.current.clientHeight,
         behavior: "instant",
@@ -65,7 +83,8 @@ export function Chat() {
     if (!scrollWrapper.current || !messages) return;
     const wrapper = scrollWrapper.current;
     const handler = () => {
-      if (isLastBatch.current || batchLoading || batchLoadingInternal.current) return;
+      if (isLastBatch.current || batchLoading || batchLoadingInternal.current)
+        return;
       if (wrapper.scrollTop < 100) {
         setBatchLoading(true);
         batchLoadingInternal.current = true;
@@ -102,7 +121,9 @@ export function Chat() {
     if (!scrollWrapper.current || !scrollableContainer.current) return;
     if (
       scrollableContainer.current!.getBoundingClientRect().height -
-      scrollWrapper.current!.scrollTop - scrollWrapper.current!.getBoundingClientRect().height > -50
+      scrollWrapper.current!.scrollTop -
+      scrollWrapper.current!.getBoundingClientRect().height >
+      -50
     )
       return;
     scrollWrapper.current.scrollTo({
@@ -128,6 +149,10 @@ export function Chat() {
         }
         setChatState(chatId, { status: "success" });
         setMessages(chatId, result);
+        scrollWrapper.current?.scrollTo({
+          top: scrollableContainer.current?.clientHeight,
+          behavior: "instant",
+        });
         // setIsLoading(false);
       });
     } else {
@@ -220,6 +245,9 @@ export function Chat() {
             <p>Failed to load messages: {batchLoadError}.</p>
           </div>
         ) : null}
+      </div>
+      <div className="absolute bottom-0 flex justify-center inset-x-0 px-1 md:px-5 lg:px-10">
+        <Prompt />
       </div>
     </div>
   );

@@ -17,12 +17,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { cn } from "./utils";
 import { useServiceStore } from "../lib/state/service";
 import type { Model } from "../lib/model/service";
+import { useAuthStore } from "../lib/state/auth";
 
 export function Prompt() {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const addChat = useChatsStore((state) => state.initializeChat);
   const params = useParams();
+  const isAuthorized = useAuthStore((state) => state.user !== null);
   const chatId = params["chatId"];
   const [isRequesting, setIsRequesting] = useState(false);
   const models = useServiceStore((state) => state.models);
@@ -84,6 +86,8 @@ export function Prompt() {
       setMessage("");
     }
   };
+
+  if (!isAuthorized) return <></>;
 
   return (
     <div className="w-full max-w-4xl bg-pink-50/90 backdrop-blur-3xl border border-b-0 border-pink-200 p-2 rounded-t-lg">

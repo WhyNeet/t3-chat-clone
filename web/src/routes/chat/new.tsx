@@ -6,6 +6,7 @@ import { createChat } from "../../lib/api/chats";
 import { useServiceStore } from "../../lib/state/service";
 import { sendAndSubscribe } from "../../lib/api/messages";
 import { Fragment } from "react/jsx-runtime";
+import { Prompt } from "../../components/prompt";
 
 export function NewChat() {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export function NewChat() {
   }
 
   return (
-    <div className="h-full w-full flex items-center justify-center px-4 md:px-10">
+    <div className="h-full w-full flex items-center justify-center px-4 sm:px-8 md:px-10 lg:px-16">
       <div className="max-w-3xl w-full">
         <h1 className="text-2xl font-bold font-display">Hello there!</h1>
         <p className="text-pink-900 font-display mb-4">
@@ -41,7 +42,7 @@ export function NewChat() {
             intent="secondary"
             rounded="circle"
             size="small"
-            className="px-3 py-1.5"
+            className="px-3 py-1.5 active:scale-[0.97] transition"
           >
             <Telescope className="h-5 w-5" />
             Explore Features
@@ -50,7 +51,8 @@ export function NewChat() {
             intent="secondary"
             rounded="circle"
             size="small"
-            className="px-3 py-1.5"
+            className="px-3 py-1.5 active:scale-[0.97] transition"
+            onClick={() => navigate("/settings/keys")}
           >
             <Key className="h-5 w-5" />
             Bring your own key
@@ -69,7 +71,7 @@ export function NewChat() {
             <Fragment key={prompt}>
               <button
                 onClick={() => sendPrompt(prompt)}
-                className="w-full font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left"
+                className="w-full font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left active:scale-[0.99] transition"
               >
                 {prompt}
               </button>
@@ -77,6 +79,9 @@ export function NewChat() {
             </Fragment>
           ))}
         </div>
+      </div>
+      <div className="absolute bottom-0 flex justify-center inset-x-0 px-1 md:px-5 lg:px-10">
+        <Prompt />
       </div>
     </div>
   );

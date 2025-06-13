@@ -51,3 +51,8 @@ span.size-48 {
 code {
   font-family: "JetBrains Mono Variable" !important, var(--font-mono);
 }
+
+
+#chats-list::-webkit-scrollbar {
+  display: none;
+}

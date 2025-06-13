@@ -6,6 +6,9 @@ import { RouterProvider } from "react-router";
 import { Signup } from "./routes/auth/signup";
 import { Chat } from "./routes/chat/chat";
 import { NewChat } from "./routes/chat/new";
+import { Settings } from "./routes/settings";
+import { KeysSettings } from "./routes/settings/keys";
+import { ThemesSettings } from "./routes/settings/themes";
 
 const router = createBrowserRouter([
   {
@@ -22,6 +25,18 @@ const router = createBrowserRouter([
           {
             path: "chat/:chatId",
             Component: Chat
+          },
+          {
+            path: "settings",
+            Component: Settings,
+          },
+          {
+            path: "settings/keys",
+            Component: KeysSettings
+          },
+          {
+            path: "settings/themes",
+            Component: ThemesSettings
           }
         ]
       },

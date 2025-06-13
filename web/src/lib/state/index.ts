@@ -1,13 +1,18 @@
 import { me } from "../api/auth";
 import { chats } from "../api/chats";
 import { is, subscribeToStream } from "../api/completions";
+import { listKeys } from "../api/keys";
 import { listModels } from "../api/service";
 import { useAuthStore } from "./auth";
 import { useChatsStore } from "./chats";
 import { useServiceStore } from "./service";
 
 export async function init() {
-  const { setModels } = useServiceStore.getState();
+  const { setModels, setKeys } = useServiceStore.getState();
+
+  listKeys().then(keys => {
+    setKeys(keys);
+  });
 
   const models = await listModels();
   setModels(models);

@@ -15,7 +15,7 @@ pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) ->
     let keys = if let Ok(key) =
         UserApiKey::get(format!("openrouter-{}", session.user_id), &mut conn).await
     {
-        vec![(key.id, key.key, "openrouter".to_string())]
+        vec![(key.key_id, key.key, "openrouter".to_string())]
     } else {
         let keys = state
             .database()
@@ -44,5 +44,5 @@ pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) ->
         .into_iter()
         .map(|(key_id, _, key_provider)| json!({ "id": key_id, "provider": key_provider }))
         .collect();
-    (StatusCode::OK, Json(json!({ "keys": keys_json })))
+    (StatusCode::OK, Json(keys_json))
 }

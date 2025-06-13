@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod chats;
 pub mod completion;
+pub mod keys;
 pub mod service;
 pub mod users;
 
@@ -17,4 +18,5 @@ pub fn router() -> Router<Arc<AppState>> {
         .merge(auth::router())
         .merge(users::router())
         .merge(chats::router())
+        .merge(keys::router())
 }

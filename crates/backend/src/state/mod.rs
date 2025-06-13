@@ -5,7 +5,7 @@ use std::{
 
 use crate::{config::ModelsConfig, data::mongodb::MongoDataAdapter, search::WebSearch};
 use ai::openai::{completions::OpenAICompletionDelta, streaming::OpenAIClient};
-use model::{chat::Chat, message::ChatMessage, user::User};
+use model::{chat::Chat, key::ApiKey, message::ChatMessage, user::User};
 use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
 use redis_om::redis::aio::MultiplexedConnection;
 use serde::Serialize;
@@ -17,6 +17,7 @@ pub struct AppState {
     database: Database,
     redis: MultiplexedConnection,
     hmac_key: Box<[u8]>,
+    aes_key: Box<[u8]>,
     models: ModelsConfig,
     search: WebSearch,
 }
@@ -26,6 +27,7 @@ impl AppState {
         openrouter: OpenAIClient,
         client: Client,
         redis: redis_om::Client,
+        aes_key: Box<[u8]>,
         hmac_key: Box<[u8]>,
         search: WebSearch,
     ) -> anyhow::Result<Self> {
@@ -51,6 +53,12 @@ impl AppState {
             .create_index(IndexModel::builder().keys(doc! { "chat_id": 1 }).build())
             .await?;
 
+        client
+            .database("chat")
+            .collection::<ApiKey>("keys")
+            .create_index(IndexModel::builder().keys(doc! { "user_id": 1 }).build())
+            .await?;
+
         let conn = redis.get_multiplexed_tokio_connection().await?;
 
         Ok(Self {
@@ -67,9 +75,15 @@ impl AppState {
                     "chat".to_string(),
                     "chats".to_string(),
                 ),
-                messages: MongoDataAdapter::new(client, "chat".to_string(), "messages".to_string()),
+                messages: MongoDataAdapter::new(
+                    client.clone(),
+                    "chat".to_string(),
+                    "messages".to_string(),
+                ),
+                keys: MongoDataAdapter::new(client, "chat".to_string(), "keys".to_string()),
             },
             redis: conn,
+            aes_key,
             hmac_key,
             models: ModelsConfig::new(),
             search,
@@ -111,6 +125,10 @@ impl AppState {
     pub fn search(&self) -> &WebSearch {
         &self.search
     }
+
+    pub fn aes_key(&self) -> &[u8] {
+        &self.aes_key
+    }
 }
 
 pub enum ApiDelta {
@@ -130,4 +148,5 @@ pub struct Database {
     pub users: MongoDataAdapter<User>,
     pub chats: MongoDataAdapter<Chat>,
     pub messages: MongoDataAdapter<ChatMessage>,
+    pub keys: MongoDataAdapter<ApiKey>,
 }

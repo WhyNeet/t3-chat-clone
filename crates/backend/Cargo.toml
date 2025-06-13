@@ -31,3 +31,4 @@ tower = "0.5.2"
 hex = "0.4.3"
 chrono = { version = "0.4.41", features = ["serde"] }
 reqwest = "0.12.20"
+aes-gcm = "0.10.3"

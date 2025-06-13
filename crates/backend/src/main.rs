@@ -38,10 +38,23 @@ async fn main() {
         .as_bytes()
         .to_vec()
         .into_boxed_slice();
+    let aes_key = hex::decode(
+        env::var("KEY_ENCRYPTION_SECRET")
+            .expect("Missing key encryption secret")
+            .as_bytes(),
+    )
+    .unwrap();
     let web_search = WebSearch::new(env::var("SERPER_KEY").expect("Missing OpenRouter API key"));
-    let app_state = AppState::new(openrouter, mongodb, redis, session_key, web_search)
-        .await
-        .unwrap();
+    let app_state = AppState::new(
+        openrouter,
+        mongodb,
+        redis,
+        aes_key.into_boxed_slice(),
+        session_key,
+        web_search,
+    )
+    .await
+    .unwrap();
     let app_state = Arc::new(app_state);
 
     let app = Router::new()

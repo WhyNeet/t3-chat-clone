@@ -1,5 +1,6 @@
 use std::{env, str::FromStr, sync::Arc, time::Duration};
 
+use aes_gcm::{Aes256Gcm, Key, KeyInit, aead::AeadMut};
 use ai::openai::{
     completions::{OpenAICompletionDelta, OpenAIMessage, ReasoningEffort},
     streaming::OpenAIClient,
@@ -12,8 +13,13 @@ use axum::{
 };
 use chrono::Utc;
 use futures::{StreamExt, TryStreamExt};
-use model::message::{ChatMessage, Role};
+use hmac::digest::generic_array::GenericArray;
+use model::{
+    key::UserApiKey,
+    message::{ChatMessage, Role},
+};
 use mongodb::bson::{doc, oid::ObjectId};
+use redis_om::HashModel;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -97,6 +103,52 @@ pub async fn handler(
     else {
         tracing::error!("Failed to list message.");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let mut conn = state.redis();
+
+    let api_key = if let Ok(cached_key) =
+        UserApiKey::get(format!("openrouter-{}", session.user_id), &mut conn).await
+    {
+        Some(cached_key.key)
+    } else {
+        let key = state
+            .database()
+            .keys
+            .get(doc! { "user_id": ObjectId::from_str(&session.user_id).unwrap() })
+            .await
+            .unwrap();
+        if let Some(ref key) = key {
+            let _ = UserApiKey {
+                id: format!("openrouter-{}", session.user_id),
+                key: key.key.clone(),
+                key_id: key.id.unwrap().to_hex(),
+            }
+            .save(&mut conn)
+            .await;
+        }
+
+        key.map(|key| key.key)
+    };
+
+    let client = if let Some(api_key) = api_key {
+        let (nonce, ciphertext) = api_key.split_once('.').unwrap();
+        let nonce = hex::decode(nonce).unwrap();
+        let ciphertext = hex::decode(ciphertext).unwrap();
+
+        let key = Key::<Aes256Gcm>::from_slice(state.aes_key());
+        let mut cipher = Aes256Gcm::new(&key);
+        let plaintext = cipher
+            .decrypt(GenericArray::from_slice(&nonce), ciphertext.as_ref())
+            .unwrap();
+
+        if model.base_url.starts_with("https://openrouter.ai") {
+            OpenAIClient::new(String::from_utf8(plaintext).unwrap(), model.base_url)
+        } else {
+            todo!()
+        }
+    } else {
+        state.openrouter().clone()
     };
 
     let (tx, rx) = flume::unbounded();
@@ -231,9 +283,7 @@ pub async fn handler(
                 .unwrap();
         });
 
-        let Ok(stream) = task_state
-            .openrouter()
-            .clone()
+        let Ok(stream) = client
             .completion(payload.model, messages, Some(0.7), payload.reasoning)
             .await
         else {

@@ -3,9 +3,9 @@ import type { Model } from "../model/service";
 
 export interface ServiceStore {
   models: Model[] | null;
-  inferenceError: Record<string, string>; // Provier name -> error
+  inferenceError: Record<string, number>; // Provier name -> error
   setModels: (models: Model[]) => void;
-  setInferenceError: (provider: string, error: string) => void;
+  setInferenceError: (provider: string, code: number) => void;
 }
 
 export const useServiceStore = create<ServiceStore>((set) => ({

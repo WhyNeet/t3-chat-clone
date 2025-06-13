@@ -8,6 +8,7 @@ import { useAuthStore } from "../../lib/state/auth";
 import { isError } from "../../lib/api/error";
 import { useState } from "react";
 import { Loader } from "../../components/ui/loader";
+import { CircleAlert } from "lucide-react";
 
 export interface Inputs {
   email: string;
@@ -77,6 +78,10 @@ export function Login() {
         {error ? (
           <p className="text-red-500 font-medium font-display text-center text-sm">{error}</p>
         ) : null}
+        <div className="flex items-start gap-2 px-2 py-2 rounded-lg border border-pink-900/20 mt-4 text-pink-900 font-display text-sm">
+          <CircleAlert className="h-8 w-8" />
+          Please allow third-party cookies after you log in.
+        </div>
       </form>
       <p className="text-black/50 font-display">
         Don't have an account?{" "}

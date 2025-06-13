@@ -98,10 +98,12 @@ export const sendAndSubscribe = async (
       } else if (is.chatNameUpdated(control.control)) {
         updateChatName(chatId, control.control.name);
       } else if (is.inferenceError(control.control)) {
+        console.log("error", provider, control);
         if (
-          provider === "https://https://openrouter.ai/api/v1/chat/completions"
+          provider === "https://openrouter.ai/api/v1/chat/completions"
         ) {
-          setInferenceError("openrouter", control.control.error);
+          setInferenceError("openrouter", control.control.code);
+          console.log("code", control.control.code);
         }
         localStorage.removeItem(`stream-${chatId}`);
         localStorage.removeItem(`streaming-message-${chatId}`);

@@ -41,7 +41,7 @@ export function Chat() {
   const [batchLoadError, setBatchLoadError] = useState<string | null>(null);
   const [batchLoading, setBatchLoading] = useState(false);
   const batchLoadingInternal = useRef(false);
-  const inferenceError: string | null = useServiceStore(state => state.inferenceError["openrouter"] ?? null);
+  const inferenceError: number | null = useServiceStore(state => state.inferenceError["openrouter"] ?? null);
 
   useEffect(() => {
     if (!scrollWrapper.current || !scrollableContainer.current) return;

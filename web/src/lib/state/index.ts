@@ -78,7 +78,7 @@ export async function init() {
                   updateChatName(chat.id, control.control.name);
                 } else if (is.inferenceError(control.control)) {
                   if (provider === "https://https://openrouter.ai/api/v1/chat/completions") {
-                    setInferenceError("openrouter", control.control.error);
+                    setInferenceError("openrouter", control.control.code);
                   }
                   localStorage.removeItem(`stream-${chat.id}`);
                   localStorage.removeItem(`streaming-message-${chat.id}`);

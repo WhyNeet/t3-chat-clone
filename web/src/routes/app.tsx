@@ -23,7 +23,7 @@ export function App() {
 
   return (
     <div
-      className={`h-full w-full flex relative transition-[padding-top] duration-200 bg-pink-200 ${sidebarOpen ? "md:pt-1" : ""}`}
+      className={`h-full w-full overflow-hidden flex relative transition-[padding-top] duration-200 bg-pink-200 ${sidebarOpen ? "md:pt-1" : ""}`}
     >
       <div
         className={`transition-all duration-200 ease-in-out fixed md:relative left-0 top-1 bottom-0 z-50 bg-pink-200 rounded-tr-2xl ${sidebarOpen ? "min-w-72 w-72" : "min-w-0 w-0"}`}

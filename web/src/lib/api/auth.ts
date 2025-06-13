@@ -39,6 +39,13 @@ export async function signup(payload: SignupPayload): Promise<User | { error: st
   return user;
 }
 
+export async function logout(): Promise<void> {
+  await fetch(`${BACKEND_URI}/auth/logout`, {
+    method: "POST",
+    credentials: "include"
+  });
+}
+
 export async function me(): Promise<User | null> {
   const response = await fetch(`${BACKEND_URI}/users/me`, {
     method: "GET",

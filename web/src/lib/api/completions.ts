@@ -64,7 +64,7 @@ export interface ControlChatNameUpdated {
 
 export interface ControlInferenceError {
   kind: ControlKind.InferenceError;
-  error: string;
+  code: number;
 }
 
 export interface CompletionControlData {

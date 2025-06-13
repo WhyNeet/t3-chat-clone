@@ -1,6 +1,9 @@
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{env, str::FromStr, sync::Arc, time::Duration};
 
-use ai::openai::completions::{OpenAICompletionDelta, OpenAIMessage, ReasoningEffort};
+use ai::openai::{
+    completions::{OpenAICompletionDelta, OpenAIMessage, ReasoningEffort},
+    streaming::OpenAIClient,
+};
 use axum::{
     Json,
     extract::{Path, State},
@@ -18,7 +21,7 @@ use uuid::Uuid;
 use crate::{
     middleware::auth::Auth,
     payload::chat::ChatMessagePayload,
-    state::{ApiDelta, AppState},
+    state::{ApiDelta, AppState, ControlChunk},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -41,6 +44,7 @@ pub async fn handler(
         .free_models()
         .iter()
         .find(|model| model.identifier == payload.model)
+        .cloned()
     else {
         return (
             StatusCode::BAD_REQUEST,
@@ -95,16 +99,7 @@ pub async fn handler(
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
 
-    let search_results = if payload.use_search {
-        let search_query = payload.message.trim();
-        if search_query.is_empty() || search_query.len() > 400 {
-            None
-        } else {
-            state.search().search(search_query.to_string()).await.ok()
-        }
-    } else {
-        None
-    };
+    let (tx, rx) = flume::unbounded();
 
     let user_message = ChatMessage {
         id: None,
@@ -116,29 +111,42 @@ pub async fn handler(
         timestamp: Utc::now(),
     };
 
-    let message_for_assistant = if let Some(results) = search_results {
-        let context: String = results
-            .organic
-            .iter()
-            .take(10)
-            .map(|result| {
-                format!(
-                    " - Title: {};\nSnippet: {};\nSource: {};\n",
-                    result.title, result.snippet, result.link
-                )
-            })
-            .collect();
+    if messages.is_empty() {
+        let title_generation_message = format!(
+            "Here are some examples of first messages and their chat names:\n\ninput: I need help choosing a new laptop for college.\noutput: Laptop Recommendations for College\n\ninput:  Best places to eat Italian food in downtown Chicago?\noutput: Chicago Italian Food Guide\n\nNow, generate a descriptive name for a chat where the first message was: \"{}\"\nYour output must be a SINGLE, SHORT sentence. Do not include any parentheses, other symbols or any words except for the final result.",
+            payload.message
+        );
 
-        format!(
-            r#"Use the following search results to answer the query. If information is insufficient, state that.;
-            Search Results:\n{context};
-            Query: {};
-            \nAnswer:"#,
-            user_message.content.trim()
-        )
-    } else {
-        user_message.content.clone()
-    };
+        let task_state = Arc::clone(&state);
+        let task_tx = tx.clone();
+        tokio::spawn(async move {
+            let chat_name = OpenAIClient::new(
+                env::var("CHUTES_KEY").unwrap(),
+                "https://llm.chutes.ai/v1/completions".to_string(),
+            )
+            .prompt_completion_non_streaming(
+                "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
+                title_generation_message,
+                Some(0.),
+                Some(1000),
+            )
+            .await
+            .unwrap();
+            task_tx
+                .send_async(ApiDelta::Control(ControlChunk::ChatNameUpdated {
+                    name: chat_name.clone(),
+                }))
+                .await
+                .unwrap();
+
+            task_state
+                .database()
+                .chats
+                .update(chat.id.unwrap(), doc! { "$set": { "name": chat_name } })
+                .await
+                .unwrap();
+        });
+    }
 
     let user_message_id = state
         .database()
@@ -147,59 +155,112 @@ pub async fn handler(
         .await
         .unwrap();
 
-    messages.push(OpenAIMessage {
-        role: "user".to_string(),
-        content: message_for_assistant,
-    });
-
-    let assistant_message_id = ObjectId::new();
-    let assistant_message = ChatMessage {
-        id: Some(assistant_message_id),
-        content: String::new(),
-        model: Some(model.name.clone()),
-        role: Role::Assistant,
-        reasoning: None,
-        chat_id: chat.id.unwrap(),
-        timestamp: Utc::now(),
-    };
-    let task_state = Arc::clone(&state);
-    let task_message = assistant_message.clone();
-    tokio::spawn(async move {
-        task_state
-            .database()
-            .messages
-            .create(task_message)
-            .await
-            .unwrap();
-    });
-
-    let client = state.openrouter().clone();
-    let Ok(stream) = client
-        .completion(payload.model, messages, Some(0.7), payload.reasoning)
-        .await
-    else {
-        tracing::error!("Failed to get stream.");
-        return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
-    };
-    tracing::debug!("Created stream.");
-    let mut stream = Box::pin(stream);
+    let user_message_content = user_message.content.clone();
 
     let stream_id = Uuid::new_v4();
-
-    let (tx, rx) = flume::unbounded();
     let task_state = Arc::clone(&state);
     tokio::spawn(async move {
+        let search_results = if payload.use_search {
+            let search_query = payload.message.trim();
+            if search_query.is_empty() || search_query.len() > 400 {
+                None
+            } else {
+                task_state
+                    .search()
+                    .search(search_query.to_string())
+                    .await
+                    .ok()
+            }
+        } else {
+            None
+        };
+
+        tracing::debug!("Searched");
+
+        tx.send_async(ApiDelta::Control(ControlChunk::WebSearchPerformed))
+            .await
+            .unwrap();
+
+        let message_for_assistant = if let Some(results) = search_results {
+            let context: String = results
+                .organic
+                .iter()
+                .take(10)
+                .map(|result| {
+                    format!(
+                        " - Title: {};\nSnippet: {};\nSource: {};\n",
+                        result.title, result.snippet, result.link
+                    )
+                })
+                .collect();
+
+            format!(
+                r#"Use the following search results to answer the query. If information is insufficient, state that.;
+              Search Results:\n{context};
+              Query: {};
+              \nAnswer:"#,
+                user_message.content.trim()
+            )
+        } else {
+            user_message.content.clone()
+        };
+
+        messages.push(OpenAIMessage {
+            role: "user".to_string(),
+            content: message_for_assistant,
+        });
+
+        let assistant_message_id = ObjectId::new();
+        let assistant_message = ChatMessage {
+            id: Some(assistant_message_id),
+            content: String::new(),
+            model: Some(model.name.clone()),
+            role: Role::Assistant,
+            reasoning: None,
+            chat_id: chat.id.unwrap(),
+            timestamp: Utc::now(),
+        };
+        let task2_state = Arc::clone(&task_state);
+        let task_message = assistant_message.clone();
+        tokio::spawn(async move {
+            task2_state
+                .database()
+                .messages
+                .create(task_message)
+                .await
+                .unwrap();
+        });
+
+        let Ok(stream) = task_state
+            .openrouter()
+            .clone()
+            .completion(payload.model, messages, Some(0.7), payload.reasoning)
+            .await
+        else {
+            tracing::error!("Failed to get stream.");
+            return;
+        };
+        tracing::debug!("Created stream.");
+        let mut stream = Box::pin(stream);
+
         let mut reasoning: Option<String> = None;
         let mut content = String::new();
 
         let mut reasoning_acc: Option<String> = None;
         let mut content_acc = String::new();
         let mut iteration_start = Utc::now().timestamp_millis();
+        // let mut is_thinking_content = false;
         while let Ok(chunk) = stream.try_next().await {
             let Some(chunk) = chunk else { break };
             let delta = &chunk.choices.get(0).unwrap().delta;
             let reasoning_content = delta.reasoning.as_ref();
-            let delta_content = delta.content.as_ref().unwrap();
+            let delta_content = delta.content.as_ref();
+
+            if let Some(delta_content) = delta_content {
+                content_acc.push_str(delta_content);
+                content.push_str(delta_content);
+            }
+
             if let Some(reasoning_content) = reasoning_content {
                 if let Some(ref mut reasoning) = reasoning {
                     reasoning.push_str(reasoning_content);
@@ -208,13 +269,43 @@ pub async fn handler(
                 }
 
                 if reasoning_acc.is_none() {
-                    reasoning_acc = Some(reasoning_content.clone());
+                    reasoning_acc = Some(reasoning_content.to_string());
                 } else {
                     reasoning_acc.as_mut().unwrap().push_str(reasoning_content);
                 }
             }
-            content.push_str(delta_content);
-            content_acc.push_str(delta_content);
+
+            // if let Some(mut delta_content) = delta_content.take() {
+            //     if delta_content.starts_with("<think>") {
+            //         is_thinking_content = true;
+            //         delta_content = delta_content[7..].to_string();
+            //     }
+
+            //     if !is_thinking_content {
+            //         content.push_str(&delta_content);
+            //         content_acc.push_str(&delta_content);
+            //     } else {
+            //         let mut spl = delta_content.split("</think>");
+            //         let thoughts = spl.next().unwrap();
+            //         let delta_content = spl.next();
+            //         if let Some(ref mut reasoning) = reasoning {
+            //             reasoning.push_str(thoughts);
+            //         } else {
+            //             reasoning = Some(thoughts.to_string())
+            //         }
+
+            //         if reasoning_acc.is_none() {
+            //             reasoning_acc = Some(thoughts.to_string());
+            //         } else {
+            //             reasoning_acc.as_mut().unwrap().push_str(thoughts);
+            //         }
+
+            //         if let Some(delta_content) = delta_content {
+            //             content.push_str(delta_content);
+            //             content_acc.push_str(delta_content);
+            //         }
+            //     }
+            // }
             if Utc::now().timestamp_millis() - iteration_start >= 100 {
                 tx.send_async(ApiDelta::Chunk(OpenAICompletionDelta {
                     content: Some(content_acc.clone()),
@@ -236,10 +327,13 @@ pub async fn handler(
             .await
             .unwrap();
         }
-        tx.send(ApiDelta::Done(ChatMessage {
-            content: content.clone(),
-            reasoning: reasoning.clone(),
-            ..assistant_message
+        tracing::debug!("Sending done chunk");
+        tx.send(ApiDelta::Control(ControlChunk::Done {
+            message: ChatMessage {
+                content: content.clone(),
+                reasoning: reasoning.clone(),
+                ..assistant_message
+            },
         }))
         .unwrap();
         task_state
@@ -268,7 +362,7 @@ pub async fn handler(
           "user_message": ChatMessagePayload {
             id: user_message_id,
             chat_id: user_message.chat_id,
-            content: user_message.content,
+            content: user_message_content,
             model: None,
             reasoning: None,
             role: user_message.role,

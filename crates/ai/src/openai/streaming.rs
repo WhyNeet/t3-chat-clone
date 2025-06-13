@@ -2,21 +2,22 @@ use std::io;
 
 use anyhow::anyhow;
 use futures::{AsyncBufReadExt, Stream, StreamExt, TryStreamExt};
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 
 use crate::openai::completions::{
     OpenAIChatCompletionRequest, OpenAIChatCompletionRequestReasoning, OpenAICompletionChunk,
-    OpenAIMessage, ReasoningEffort,
+    OpenAIMessage, OpenAIPromptCompletionRequest, OpenAIPromptCompletionResponse, ReasoningEffort,
 };
 
 #[derive(Debug, Clone)]
 pub struct OpenAIClient {
     key: String,
+    endpoint: String,
 }
 
 impl OpenAIClient {
-    pub fn new(key: String) -> Self {
-        Self { key }
+    pub fn new(key: String, endpoint: String) -> Self {
+        Self { key, endpoint }
     }
 
     pub async fn completion(
@@ -39,11 +40,14 @@ impl OpenAIClient {
         };
 
         let request = client
-            .post("https://openrouter.ai/api/v1/chat/completions")
+            .post(self.endpoint)
             .bearer_auth(self.key)
             .json(&openai_req_body)
             .send()
             .await?;
+        if request.status() != StatusCode::OK {
+            anyhow::bail!("Status code not OK.");
+        }
         let bytes_stream = request.bytes_stream();
 
         Ok(bytes_stream
@@ -72,5 +76,37 @@ impl OpenAIClient {
                     Err(e) => Some(Err(anyhow!("error: {e}"))),
                 }
             }))
+    }
+
+    pub async fn prompt_completion_non_streaming(
+        self,
+        model: String,
+        prompt: String,
+        temperature: Option<f32>,
+        max_tokens: Option<u32>,
+    ) -> anyhow::Result<String> {
+        let client = Client::new();
+
+        let openai_req_body = OpenAIPromptCompletionRequest {
+            model,
+            prompt,
+            stream: false,
+            temperature,
+            max_tokens,
+            reasoning: None,
+        };
+
+        let response = client
+            .post(self.endpoint)
+            .bearer_auth(self.key)
+            .json(&openai_req_body)
+            .send()
+            .await?;
+
+        let mut response: OpenAIPromptCompletionResponse = response.json().await?;
+
+        // dbg!(&response);
+
+        Ok(response.choices.remove(0).text.trim().to_string())
     }
 }

@@ -60,3 +60,26 @@ pub enum ReasoningEffort {
     #[serde(rename = "low")]
     Low,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenAIPromptCompletionRequest {
+    pub model: String,
+    pub prompt: String,
+    pub stream: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<OpenAIChatCompletionRequestReasoning>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenAIPromptCompletionResponse {
+    pub id: String,
+    pub choices: Vec<OpenAIPromptCompletionChoice>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenAIPromptCompletionChoice {
+    pub text: String,
+}

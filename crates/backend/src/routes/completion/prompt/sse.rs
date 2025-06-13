@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     payload::chat::ChatMessagePayload,
-    state::{ApiDelta, AppState},
+    state::{ApiDelta, AppState, ControlChunk},
 };
 
 pub async fn handler(
@@ -24,19 +24,24 @@ pub async fn handler(
 
     let stream = recv.into_stream().map(move |delta| match delta {
         ApiDelta::Chunk(chunk) => Event::default().json_data(chunk),
-        ApiDelta::Done(message) => {
-            state.remove_stream(&stream_id);
-            tracing::debug!("Streaming finished.");
-            Event::default().json_data(json!({ "control": "done", "message": ChatMessagePayload {
-              id: message.id.unwrap(),
-              chat_id: message.chat_id,
-              content: message.content,
-              model: message.model,
-              reasoning: None,
-              role: message.role,
-              timestamp: message.timestamp
-            } }))
-        }
+        ApiDelta::Control(control) => match control {
+            ControlChunk::Done { message } => {
+                state.remove_stream(&stream_id);
+                tracing::debug!("Streaming finished.");
+                Event::default().json_data(
+                    json!({ "control": { "kind": "Done", "message": ChatMessagePayload {
+                      id: message.id.unwrap(),
+                      chat_id: message.chat_id,
+                      content: message.content,
+                      model: message.model,
+                      reasoning: message.reasoning,
+                      role: message.role,
+                      timestamp: message.timestamp
+                } } }),
+                )
+            }
+            other => Event::default().json_data(json!({ "control": other })),
+        },
     });
 
     Sse::new(stream)

@@ -8,6 +8,7 @@ use ai::openai::{completions::OpenAICompletionDelta, streaming::OpenAIClient};
 use model::{chat::Chat, message::ChatMessage, user::User};
 use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
 use redis_om::redis::aio::MultiplexedConnection;
+use serde::Serialize;
 use uuid::Uuid;
 
 pub struct AppState {
@@ -114,7 +115,15 @@ impl AppState {
 
 pub enum ApiDelta {
     Chunk(OpenAICompletionDelta),
-    Done(ChatMessage),
+    Control(ControlChunk),
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "kind")]
+pub enum ControlChunk {
+    Done { message: ChatMessage },
+    WebSearchPerformed,
+    ChatNameUpdated { name: String },
 }
 
 pub struct Database {

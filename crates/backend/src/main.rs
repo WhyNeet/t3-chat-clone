@@ -29,8 +29,10 @@ async fn main() {
         let uri = env::var("REDIS_URI").expect("Missing Redis URI");
         redis_om::Client::open(uri).unwrap()
     };
-    let openrouter =
-        OpenAIClient::new(env::var("OPENROUTER_KEY").expect("Missing OpenRouter API key"));
+    let openrouter = OpenAIClient::new(
+        env::var("OPENROUTER_KEY").expect("Missing OpenRouter API key"),
+        "https://openrouter.ai/api/v1/chat/completions".to_string(),
+    );
     let session_key = env::var("SESSION_SECRET_KEY")
         .expect("Missing session secret key")
         .as_bytes()

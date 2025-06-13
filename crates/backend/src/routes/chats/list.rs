@@ -28,7 +28,7 @@ pub async fn handler(
         .chats
         .get_many_sorted(
             doc! { "user_id": ObjectId::from_str(&session.user_id).unwrap() },
-            doc! { "timestamp": -1 },
+            doc! { "timestamp": 1 },
         )
         .await
     else {

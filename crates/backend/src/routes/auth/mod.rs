@@ -20,4 +20,5 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/auth/register", post(register::handler))
         .route("/auth/login", post(login::handler))
+        .route("/auth/logout", post(logout::handler))
 }

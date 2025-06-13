@@ -45,6 +45,7 @@ export enum ControlKind {
   Done = "Done",
   WebSearchPerformed = "WebSearchPerformed",
   ChatNameUpdated = "ChatNameUpdated",
+  InferenceError = "InferenceError",
 }
 
 export interface ControlDone {
@@ -61,8 +62,13 @@ export interface ControlChatNameUpdated {
   name: string;
 }
 
+export interface ControlInferenceError {
+  kind: ControlKind.InferenceError;
+  error: string;
+}
+
 export interface CompletionControlData {
-  control: ControlDone | ControlWebSearchPerformed | ControlChatNameUpdated;
+  control: ControlDone | ControlWebSearchPerformed | ControlChatNameUpdated | ControlInferenceError;
 }
 
 export type CompletionData = OpenAICompletionDelta | CompletionControlData;
@@ -86,5 +92,10 @@ export const is = {
     data: CompletionControlData["control"],
   ): data is ControlChatNameUpdated {
     return data.kind === ControlKind.ChatNameUpdated;
+  },
+  inferenceError(
+    data: CompletionControlData["control"],
+  ): data is ControlInferenceError {
+    return data.kind === ControlKind.InferenceError;
   },
 };

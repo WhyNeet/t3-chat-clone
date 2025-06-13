@@ -4,16 +4,27 @@ import { useChatsStore } from "../lib/state/chats";
 import { AuthState, useAuthStore } from "../lib/state/auth";
 import { Button } from "./ui/button";
 import { Loader } from "./ui/loader";
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, Pen, Trash } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import { deleteChat } from "../lib/api/chats";
+import { useNavigate } from "react-router";
 
 export function ChatsSidebar() {
+  const navigate = useNavigate();
   const isLoggedIn = useAuthStore((state) => !!state.user);
   const isUserLoading = useAuthStore(
     (state) => state.state === AuthState.Loading,
   );
+  const deleteChatState = useChatsStore(state => state.deleteChat);
   const chats = useChatsStore((state) => state.chats);
   const isLoading = useChatsStore((state) => state.isFetching);
   const user = useAuthStore((state) => state.user);
+
+  const handleDeleteChat = async (id: string) => {
+    await deleteChat(id);
+    deleteChatState(id);
+    navigate("/");
+  }
 
   return (
     <aside className="min-w-72 max-w-72 rounded-tr-3xl h-[calc(100vh-0.25rem)] absolute right-0 flex flex-col">
@@ -50,9 +61,23 @@ export function ChatsSidebar() {
                         {streaming ? (
                           <Loader className="h-5 w-5 text-pink-900" />
                         ) : (
-                          <div className="hidden group-hover:block">
-                            <Ellipsis className="h-6 w-6 stroke-2" />
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="cursor-pointer">
+                                <Ellipsis className="h-6 w-6 stroke-2" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56 font-display text-pink-950" align="start">
+                              <DropdownMenuItem onClick={() => { }}>
+                                <Pen className="h-4 w-4" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteChat(chat.id)} className="text-red-500 hover:text-white hover:bg-red-500!">
+                                <Trash className="h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </NavLink>

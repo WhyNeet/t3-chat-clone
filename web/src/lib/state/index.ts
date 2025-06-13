@@ -6,13 +6,14 @@ import { useAuthStore } from "./auth";
 import { useChatsStore } from "./chats";
 import { useServiceStore } from "./service";
 
-export function init() {
+export async function init() {
   const { setModels } = useServiceStore.getState();
 
-  listModels().then((models) => setModels(models));
-
+  const models = await listModels();
+  setModels(models);
   const { updateUser } = useAuthStore.getState();
 
+  const { setInferenceError } = useServiceStore.getState();
   const {
     initializeChat,
     finishFetching,
@@ -45,6 +46,7 @@ export function init() {
             const model = localStorage.getItem(
               `streaming-message-${chat.id}-model`,
             );
+            const provider = models.find(m => m.identifier === model)!.base_url;
             initPendingMessage(chat.id, model ?? "AI", isSearching);
             updatePendingMessage(chat.id, { content: message, reasoning });
             subscribeToStream(
@@ -74,6 +76,18 @@ export function init() {
                   finishWebSearch(chat.id);
                 } else if (is.chatNameUpdated(control.control)) {
                   updateChatName(chat.id, control.control.name);
+                } else if (is.inferenceError(control.control)) {
+                  if (provider === "https://https://openrouter.ai/api/v1/chat/completions") {
+                    setInferenceError("openrouter", control.control.error);
+                  }
+                  localStorage.removeItem(`stream-${chat.id}`);
+                  localStorage.removeItem(`streaming-message-${chat.id}`);
+                  localStorage.removeItem(
+                    `streaming-message-reasoning-${chat.id}`,
+                  );
+                  localStorage.removeItem(`streaming-message-${chat.id}-search`);
+                  localStorage.removeItem(`streaming-message-${chat.id}-model`);
+                  clearPendingMessage(chat.id);
                 }
               },
               (message) => {

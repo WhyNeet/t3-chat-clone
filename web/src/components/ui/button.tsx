@@ -30,6 +30,20 @@ export const button = cva(
           "disabled:hover:bg-slate-300",
           "disabled:cursor-not-allowed"
         ],
+        secondary: [
+          "bg-pink-100",
+          "hover:bg-pink-200",
+          "font-display",
+          "text-pink-950",
+          "font-semibold",
+          "border",
+          "border-pink-900",
+          "disabled:bg-slate-300",
+          "disabled:border-slate-400",
+          "disabled:text-slate-400",
+          "disabled:hover:bg-slate-300",
+          "disabled:cursor-not-allowed"
+        ],
         ghost: [
           "bg-transparent",
           "hover:bg-black/10",

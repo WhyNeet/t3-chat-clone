@@ -52,9 +52,12 @@ export interface ChatStore {
     } | null
   >; // id -> pending message string
   isFetching: boolean;
+  deleteChat: (id: string) => void;
+  renameChat: (id: string, name: string) => void;
   finishFetching: () => void;
   finishWebSearch: (id: string) => void;
   addChatMessages: (id: string, messages: ChatMessage[]) => void;
+  prependChatMessages: (id: string, messages: ChatMessage[]) => void;
   updateChatName: (id: string, name: string) => void;
   initPendingMessage: (id: string, model: string, search: boolean) => void;
   updatePendingMessage: (
@@ -67,10 +70,24 @@ export interface ChatStore {
   initializeChat: (chat: Chat, messages?: ChatMessage[]) => void;
 }
 
-export const useChatsStore = create<ChatStore>((set) => ({
+export const useChatsStore = create<ChatStore>((set, get) => ({
   chats: {},
   pendingMessages: {},
   isFetching: true,
+  renameChat: (id, name) => {
+    set((state) => ({
+      chats: {
+        ...state.chats,
+        [id]: { ...state.chats[id], chat: { ...state.chats[id].chat, name } },
+      },
+    }));
+  },
+  deleteChat: (id) => {
+    if (get().pendingMessages[id]?.content !== undefined) return;
+    const chats = { ...get().chats };
+    delete chats[id];
+    set({ chats });
+  },
   finishInitialFetch: () => set({ chats: {} }),
   updateChatName: (id, name) =>
     set((state) => ({
@@ -115,6 +132,23 @@ export const useChatsStore = create<ChatStore>((set) => ({
         },
       };
     });
+  },
+  prependChatMessages: (id, messages) => {
+    set((state) => ({
+      chats: {
+        ...state.chats,
+        [id]: {
+          ...state.chats[id]!,
+          messages: [
+            ...state.chats[id].messages,
+            ...(messages.length > 0 &&
+              messages[0].id === state.chats[id].messages[0].id
+              ? []
+              : messages),
+          ],
+        },
+      },
+    }));
   },
   addChatMessages: (id: string, messages: ChatMessage[]) => {
     set((state) => {

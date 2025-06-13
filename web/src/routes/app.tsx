@@ -4,6 +4,7 @@ import { ChatsSidebar } from "../components/chats-sidebar";
 import { ChevronRight } from "lucide-react";
 import { Outlet } from "react-router";
 import { Prompt } from "../components/prompt";
+import { cn } from "../components/utils";
 
 export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(Boolean(Number(localStorage.getItem("sidebar-open") ?? 1)));
@@ -22,24 +23,25 @@ export function App() {
 
   return (
     <div
-      className={`h-full w-full flex relative transition-[padding-top] duration-200 bg-pink-200 ${sidebarOpen ? "pt-1" : ""}`}
+      className={`h-full w-full flex relative transition-[padding-top] duration-200 bg-pink-200 ${sidebarOpen ? "md:pt-1" : ""}`}
     >
       <div
-        className={`transition-all duration-200 ease-in-out relative ${sidebarOpen ? "min-w-72 w-72" : "min-w-0 w-0"}`}
+        className={`transition-all duration-200 ease-in-out fixed md:relative left-0 top-1 bottom-0 z-50 bg-pink-200 rounded-tr-2xl ${sidebarOpen ? "min-w-72 w-72" : "min-w-0 w-0"}`}
       >
         <ChatsSidebar />
       </div>
+      <div onClick={() => setSidebarOpen(false)} className={cn("md:hidden bg-pink-950/30 absolute inset-0 z-20 transition-all", sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none")}></div>
       <div
         ref={viewRef}
-        className={`h-full bg-white transition-none duration-200 ${sidebarOpen ? "rounded-tl-3xl w-[calc(100vw-288px)]" : "w-full"} relative`}
+        className={`h-full bg-white transition-none duration-200 ${sidebarOpen ? "md:rounded-tl-3xl w-screen md:w-[calc(100vw-288px)]" : "w-full"} relative`}
       >
-        <div className="fixed top-3 left-3">
+        <div className="fixed top-3 left-3 z-50">
           <Button
             onClick={() => setSidebarOpen((prev) => !prev)}
             intent="ghost"
             size="square"
             rounded="circle"
-            className="hover:bg-pink-50"
+            className={cn(sidebarOpen ? "hover:bg-pink-50" : "bg-pink-300/20 hover:bg-pink-400/20 backdrop-blur-2xl")}
           >
             <ChevronRight
               className={`h-5 w-5 transition duration-200 ${sidebarOpen ? "rotate-180" : "rotate-0"}`}

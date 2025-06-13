@@ -1,6 +1,6 @@
 import { me } from "../api/auth";
 import { chats } from "../api/chats";
-import { subscribeToStream } from "../api/completions";
+import { is, subscribeToStream } from "../api/completions";
 import { listModels } from "../api/service";
 import { useAuthStore } from "./auth";
 import { useChatsStore } from "./chats";
@@ -13,8 +13,16 @@ export function init() {
 
   const { updateUser } = useAuthStore.getState();
 
-  const { initializeChat, finishFetching, updatePendingMessage, clearPendingMessage, addChatMessages } =
-    useChatsStore.getState();
+  const {
+    initializeChat,
+    finishFetching,
+    updatePendingMessage,
+    clearPendingMessage,
+    addChatMessages,
+    initPendingMessage,
+    finishWebSearch,
+    updateChatName,
+  } = useChatsStore.getState();
   useAuthStore.subscribe((store, prev) => {
     if (store.user && !prev.user) {
       chats({
@@ -25,12 +33,19 @@ export function init() {
           initializeChat(chat);
           const streamId = localStorage.getItem(`stream-${chat.id}`);
           if (streamId) {
-            const message = localStorage.getItem(
-              `streaming-message-${chat.id}`,
-            ) ?? "";
-            const reasoning = localStorage.getItem(
-              `streaming-message-reasoning-${chat.id}`,
-            ) ?? "";
+            const isSearching =
+              typeof localStorage.getItem(
+                `streaming-message-${chat.id}-search`,
+              ) === "string";
+            const message =
+              localStorage.getItem(`streaming-message-${chat.id}`) ?? "";
+            const reasoning =
+              localStorage.getItem(`streaming-message-reasoning-${chat.id}`) ??
+              "";
+            const model = localStorage.getItem(
+              `streaming-message-${chat.id}-model`,
+            );
+            initPendingMessage(chat.id, model ?? "AI", isSearching);
             updatePendingMessage(chat.id, { content: message, reasoning });
             subscribeToStream(
               streamId,
@@ -51,10 +66,24 @@ export function init() {
                   ) ?? "") + (delta.reasoning ?? ""),
                 );
               },
+              (control) => {
+                if (is.webSearchPerformed(control.control)) {
+                  localStorage.removeItem(
+                    `streaming-message-${chat.id}-search`,
+                  );
+                  finishWebSearch(chat.id);
+                } else if (is.chatNameUpdated(control.control)) {
+                  updateChatName(chat.id, control.control.name);
+                }
+              },
               (message) => {
                 localStorage.removeItem(`stream-${chat.id}`);
                 localStorage.removeItem(`streaming-message-${chat.id}`);
-                localStorage.removeItem(`streaming-message-reasoning-${chat.id}`);
+                localStorage.removeItem(
+                  `streaming-message-reasoning-${chat.id}`,
+                );
+                localStorage.removeItem(`streaming-message-${chat.id}-search`);
+                localStorage.removeItem(`streaming-message-${chat.id}-model`);
                 clearPendingMessage(chat.id);
                 addChatMessages(chat.id, [message]);
               },

@@ -4,6 +4,7 @@ import type { ChatMessage } from "../model/message";
 export function subscribeToStream(
   streamId: string,
   callback: (delta: OpenAICompletionDelta) => void,
+  control: (control: CompletionControlData) => void,
   close?: (message: ChatMessage) => void,
 ) {
   const events = new EventSource(
@@ -19,13 +20,16 @@ export function subscribeToStream(
 
   events.addEventListener("message", (message: MessageEvent<string>) => {
     const data: CompletionData = JSON.parse(message.data);
-    if (isControl(data)) {
-      switch (data.control) {
-        case "done":
-          events.close();
-          close?.(data.message);
-          return;
+    if (is.control(data)) {
+      const controlData = data.control;
+      if (is.done(controlData)) {
+        events.close();
+        close?.(controlData.message);
+      } else {
+        control(data);
       }
+
+      return;
     }
     callback(data);
   });
@@ -37,16 +41,50 @@ export interface OpenAICompletionDelta {
   role: string;
 }
 
-export interface CompletionControlData {
-  control: "done";
+export enum ControlKind {
+  Done = "Done",
+  WebSearchPerformed = "WebSearchPerformed",
+  ChatNameUpdated = "ChatNameUpdated",
+}
+
+export interface ControlDone {
+  kind: ControlKind.Done;
   message: ChatMessage;
+}
+
+export interface ControlWebSearchPerformed {
+  kind: ControlKind.WebSearchPerformed;
+}
+
+export interface ControlChatNameUpdated {
+  kind: ControlKind.ChatNameUpdated;
+  name: string;
+}
+
+export interface CompletionControlData {
+  control: ControlDone | ControlWebSearchPerformed | ControlChatNameUpdated;
 }
 
 export type CompletionData = OpenAICompletionDelta | CompletionControlData;
 
-export function isControl(data: CompletionData): data is CompletionControlData {
-  return (
-    (data as unknown as Record<string, string>)["control"] !== null &&
-    (data as unknown as Record<string, string>)["control"] !== undefined
-  );
-}
+export const is = {
+  control(data: CompletionData): data is CompletionControlData {
+    return (
+      (data as unknown as Record<string, string>)["control"] !== null &&
+      (data as unknown as Record<string, string>)["control"] !== undefined
+    );
+  },
+  done(data: CompletionControlData["control"]): data is ControlDone {
+    return data.kind === ControlKind.Done;
+  },
+  webSearchPerformed(
+    data: CompletionControlData["control"],
+  ): data is ControlWebSearchPerformed {
+    return data.kind === ControlKind.WebSearchPerformed;
+  },
+  chatNameUpdated(
+    data: CompletionControlData["control"],
+  ): data is ControlChatNameUpdated {
+    return data.kind === ControlKind.ChatNameUpdated;
+  },
+};

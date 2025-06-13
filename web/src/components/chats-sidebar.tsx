@@ -16,7 +16,7 @@ export function ChatsSidebar() {
   const user = useAuthStore((state) => state.user);
 
   return (
-    <aside className="min-w-72 rounded-tr-3xl h-[calc(100vh-0.25rem)] absolute right-0 flex flex-col">
+    <aside className="min-w-72 max-w-72 rounded-tr-3xl h-[calc(100vh-0.25rem)] absolute right-0 flex flex-col">
       <div className="p-6 pt-3 flex gap-4 items-center text-lg font-bold font-display justify-center">
         <Logo className="h-6 w-6 text-pink-500" />
         Why Chat
@@ -45,7 +45,7 @@ export function ChatsSidebar() {
                         `w-full rounded-lg border-2 border-transparent px-4 py-2 font-medium font-display group flex items-center justify-between ${isActive ? "border-pink-800 bg-pink-50" : ""}`
                       }
                     >
-                      {chat?.name ?? "New Chat"}
+                      <div className="whitespace-nowrap max-w-10/12 overflow-hidden overflow-ellipsis">{chat?.name ?? "New Chat"}</div>
                       <div className="flex items-center gap-2">
                         {streaming ? (
                           <Loader className="h-5 w-5 text-pink-900" />

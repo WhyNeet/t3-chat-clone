@@ -6,6 +6,7 @@ import { Role } from "../../lib/model/message";
 import { Message } from "../../components/message";
 import { useChatsStore } from "../../lib/state/chats";
 import { Loader } from "../../components/ui/loader";
+import { CircleAlert, Globe, Sparkle } from "lucide-react";
 
 export function Chat() {
   const scrollWrapper = useRef<HTMLDivElement>(null);
@@ -22,11 +23,14 @@ export function Chat() {
   const chatLoading = useChatsStore(
     (state) => state.chats[chatId]?.state.status === "loading",
   );
+  const chat = useChatsStore(state => state.chats[chatId]);
+  const chatsLoaded = useChatsStore(state => !state.isFetching);
   const setMessages = useChatsStore((state) => state.setChatMessages);
   const setChatState = useChatsStore((state) => state.setChatState);
   const pendingMessage = useChatsStore(
     (state) => state.pendingMessages[chatId],
   );
+  const isSearching = useChatsStore(state => state.chats[chatId]?.searching);
   // const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,21 +84,27 @@ export function Chat() {
 
   return (
     <div
-      className="w-full h-full overflow-y-scroll p-6 pb-32 overscroll-contain"
+      className="w-full h-full overflow-y-scroll p-6 pb-32 pt-14 overscroll-contain"
       ref={scrollWrapper}
     >
+      {chat ? <div className="absolute top-3 inset-x-0 flex items-center justify-center z-10 h-9">
+        <div className="font-display px-4 py-1 text-sm font-medium rounded-full bg-pink-300/20 backdrop-blur-2xl text-pink-900 h-full flex items-center">{chat.chat.name}</div>
+      </div> : null}
       {chatLoading ? (
         <div className="h-full w-full flex items-center justify-center gap-2">
           <Loader className="text-pink-600 h-5 w-5" />
           <p className="text-sm font-medium font-display">Loading chat...</p>
         </div>
-      ) : null}
+      ) : chatsLoaded && !chatExists ? <div className="h-full w-full flex items-center justify-center gap-2 text-red-500">
+        <CircleAlert className="h-5 w-5" />
+        <p className="text-sm font-medium font-display">Chat does not exist.</p>
+      </div> : null}
       {error ? `error: ${error}` : null}
       <div
         className="max-w-4xl flex flex-col-reverse mx-auto"
         ref={scrollableContainer}
       >
-        {pendingMessage ? (
+        {pendingMessage && (pendingMessage.content.length !== 0 || pendingMessage.reasoning && pendingMessage.reasoning.length !== 0) ? (
           <Message
             message={{
               chat_id: chatId,
@@ -107,6 +117,13 @@ export function Chat() {
             }}
           />
         ) : null}
+        {isSearching ? <div className="p-4 flex items-center gap-4 text-pink-900 font-display animate-pulse mt-4">
+          <Globe className="h-6 w-6" />
+          <p>Searching...</p>
+        </div> : (pendingMessage?.content.length === 0 && pendingMessage?.reasoning === null) ? <div className="p-4 flex items-center gap-4 text-pink-900 font-display animate-pulse mt-4">
+          <Sparkle className="h-6 w-6" />
+          <p>Waiting for inference...</p>
+        </div> : null}
         {messages
           ? messages
             .filter(

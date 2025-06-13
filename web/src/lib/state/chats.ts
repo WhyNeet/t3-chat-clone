@@ -34,19 +34,29 @@ export type ChatState =
 export interface ChatStore {
   chats: Record<
     string,
-    { chat: Chat; state: ChatState; messages: ChatMessage[]; streaming: boolean }
+    {
+      chat: Chat;
+      state: ChatState;
+      messages: ChatMessage[];
+      streaming: boolean;
+      searching: boolean;
+    }
   >; // id -> ChatState
   pendingMessages: Record<
     string,
-    { content: string; reasoning: string | null, model: string } | null
+    {
+      content: string;
+      reasoning: string | null;
+      model: string;
+      search: boolean;
+    } | null
   >; // id -> pending message string
   isFetching: boolean;
   finishFetching: () => void;
+  finishWebSearch: (id: string) => void;
   addChatMessages: (id: string, messages: ChatMessage[]) => void;
-  initPendingMessage: (
-    id: string,
-    model: string
-  ) => void;
+  updateChatName: (id: string, name: string) => void;
+  initPendingMessage: (id: string, model: string, search: boolean) => void;
   updatePendingMessage: (
     id: string,
     delta: { content: string | null; reasoning: string | null },
@@ -61,6 +71,15 @@ export const useChatsStore = create<ChatStore>((set) => ({
   chats: {},
   pendingMessages: {},
   isFetching: true,
+  finishInitialFetch: () => set({ chats: {} }),
+  updateChatName: (id, name) =>
+    set((state) => ({
+      ...state,
+      chats: {
+        ...state.chats,
+        [id]: { ...state.chats[id], chat: { ...state.chats[id].chat, name } },
+      },
+    })),
   finishFetching: () => set({ isFetching: false }),
   initializeChat: (chat, messages) => {
     set((state) => ({
@@ -70,10 +89,17 @@ export const useChatsStore = create<ChatStore>((set) => ({
           state: { status: messages ? "success" : "idle" },
           messages: messages ?? [],
           streaming: false,
+          searching: false,
         },
         ...state.chats,
       },
       pendingMessages: { ...state.pendingMessages, [chat.id]: null },
+    }));
+  },
+  finishWebSearch: (id) => {
+    set((state) => ({
+      ...state,
+      chats: { ...state.chats, [id]: { ...state.chats[id], searching: false } },
     }));
   },
   setChatMessages: (id, messages) => {
@@ -98,23 +124,21 @@ export const useChatsStore = create<ChatStore>((set) => ({
           ...state.chats,
           [id]: {
             ...currentChatState,
-            messages: [
-              ...messages,
-              ...currentChatState.messages,
-            ],
+            messages: [...messages, ...currentChatState.messages],
           },
         },
       };
     });
   },
-  initPendingMessage: (id, model) => {
-    set(state => ({
+  initPendingMessage: (id, model, search) => {
+    set((state) => ({
       pendingMessages: {
         ...state.pendingMessages,
         [id]: {
           model,
           content: "",
           reasoning: null,
+          search,
         },
       },
       chats: {
@@ -122,9 +146,10 @@ export const useChatsStore = create<ChatStore>((set) => ({
         [id]: {
           ...state.chats[id],
           streaming: true,
+          searching: search,
         },
       },
-    }))
+    }));
   },
   updatePendingMessage: (id, delta) => {
     set((state) => {
@@ -137,9 +162,7 @@ export const useChatsStore = create<ChatStore>((set) => ({
           ...state.pendingMessages,
           [id]: {
             ...state.pendingMessages[id]!,
-            content:
-              state.pendingMessages[id]!.content +
-              (delta.content ?? ""),
+            content: state.pendingMessages[id]!.content + (delta.content ?? ""),
             reasoning,
           },
         },

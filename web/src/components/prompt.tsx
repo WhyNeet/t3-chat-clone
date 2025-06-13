@@ -1,9 +1,15 @@
 import { useState, useEffect } from "react";
 import { Button } from "../components/ui/button";
-import { Brain, ChevronDownIcon, Command, Globe, SendHorizonal } from "lucide-react";
+import {
+  Brain,
+  ChevronDownIcon,
+  Command,
+  Globe,
+  SendHorizonal,
+} from "lucide-react";
 import { useParams } from "react-router";
 import { createMessage } from "../lib/api/messages";
-import { subscribeToStream } from "../lib/api/completions";
+import { is, subscribeToStream } from "../lib/api/completions";
 import { createChat } from "../lib/api/chats";
 import { useChatsStore } from "../lib/state/chats";
 import { Loader } from "../components/ui/loader";
@@ -16,18 +22,18 @@ import type { Model } from "../lib/model/service";
 export function Prompt() {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
-  const initPendingMessage = useChatsStore(
-    (state) => state.initPendingMessage,
-  );
+  const initPendingMessage = useChatsStore((state) => state.initPendingMessage);
   const updatePendingMessage = useChatsStore(
     (state) => state.updatePendingMessage,
   );
   const clearPendingMessage = useChatsStore(
     (state) => state.clearPendingMessage,
   );
+  const finishWebSearch = useChatsStore((state) => state.finishWebSearch);
+  const updateChatName = useChatsStore((state) => state.updateChatName);
   const addMessages = useChatsStore((state) => state.addChatMessages);
   const addChat = useChatsStore((state) => state.initializeChat);
-  const setChatState = useChatsStore(state => state.setChatState)
+  const setChatState = useChatsStore((state) => state.setChatState);
   const params = useParams();
   const chatId = params["chatId"];
   const [isRequesting, setIsRequesting] = useState(false);
@@ -40,7 +46,9 @@ export function Prompt() {
   useEffect(() => {
     if (models) {
       const modelId = localStorage.getItem(`chat-model-${chatId}`);
-      setSelectedModel(models.find(({ identifier }) => identifier === modelId) ?? models[0]);
+      setSelectedModel(
+        models.find(({ identifier }) => identifier === modelId) ?? models[0],
+      );
     }
   }, [models, chatId]);
 
@@ -68,21 +76,20 @@ export function Prompt() {
     }
   };
 
-  const sendAndSubscribe = async (
-    chatId: string,
-    model: Model,
-  ) => {
+  const sendAndSubscribe = async (chatId: string, model: Model) => {
     const { stream_id, user_message } = await createMessage(chatId, {
       message,
       model: model.identifier,
       reasoning: isReasoning ? "medium" : null,
-      use_search: useSearch
+      use_search: useSearch,
     });
     addMessages(chatId, [user_message]);
     setMessage("");
     localStorage.setItem(`stream-${chatId}`, stream_id);
+    if (useSearch)
+      localStorage.setItem(`streaming-message-${chatId}-search`, "");
     setIsRequesting(false);
-    initPendingMessage(chatId, model.name);
+    initPendingMessage(chatId, model.name, useSearch);
     subscribeToStream(
       stream_id,
       (delta) => {
@@ -100,11 +107,22 @@ export function Prompt() {
           (localStorage.getItem(`streaming-message-reasoning-${chatId}`) ??
             "") + (delta.reasoning ?? ""),
         );
+        localStorage.setItem(`streaming-message-${chatId}-model`, model.name);
+      },
+      (control) => {
+        if (is.webSearchPerformed(control.control)) {
+          localStorage.removeItem(`streaming-message-${chatId}-search`);
+          finishWebSearch(chatId);
+        } else if (is.chatNameUpdated(control.control)) {
+          updateChatName(chatId, control.control.name);
+        }
       },
       (message) => {
         localStorage.removeItem(`stream-${chatId}`);
         localStorage.removeItem(`streaming-message-${chatId}`);
         localStorage.removeItem(`streaming-message-reasoning-${chatId}`);
+        localStorage.removeItem(`streaming-message-${chatId}-search`);
+        localStorage.removeItem(`streaming-message-${chatId}-model`);
         clearPendingMessage(chatId);
         addMessages(chatId, [message]);
         setChatState(chatId, { status: "success" });

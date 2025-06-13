@@ -142,6 +142,7 @@ pub enum ControlChunk {
     Done { message: ChatMessage },
     WebSearchPerformed,
     ChatNameUpdated { name: String },
+    InferenceError { code: u16 },
 }
 
 pub struct Database {

@@ -46,7 +46,7 @@ impl OpenAIClient {
             .send()
             .await?;
         if request.status() != StatusCode::OK {
-            anyhow::bail!("Status code not OK.");
+            anyhow::bail!(request.status())
         }
         let bytes_stream = request.bytes_stream();
 
@@ -102,6 +102,10 @@ impl OpenAIClient {
             .json(&openai_req_body)
             .send()
             .await?;
+
+        if response.status() != StatusCode::OK {
+            anyhow::bail!(response.status())
+        }
 
         let mut response: OpenAIPromptCompletionResponse = response.json().await?;
 

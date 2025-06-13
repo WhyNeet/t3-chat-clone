@@ -81,7 +81,7 @@ pub async fn handler(
         .messages
         .get_many_sorted(
             doc! { "chat_id": chat.id.unwrap() },
-            doc! { "timestamp": 1 },
+            doc! { "timestamp": -1 },
         )
         .await
     else {
@@ -184,12 +184,12 @@ pub async fn handler(
             )
             .await
             .unwrap();
-            task_tx
+
+            let _ = task_tx
                 .send_async(ApiDelta::Control(ControlChunk::ChatNameUpdated {
                     name: chat_name.clone(),
                 }))
-                .await
-                .unwrap();
+                .await;
 
             task_state
                 .database()
@@ -282,12 +282,19 @@ pub async fn handler(
                 .await
                 .unwrap();
         });
-
-        let Ok(stream) = client
+        let stream = client
             .completion(payload.model, messages, Some(0.7), payload.reasoning)
-            .await
-        else {
-            tracing::error!("Failed to get stream.");
+            .await;
+        let Ok(stream) = stream else {
+            let error = stream.err().unwrap();
+            tracing::error!("Failed to get stream: {}", error);
+            if let Ok(code) = error.downcast::<StatusCode>() {
+                let _ = tx
+                    .send_async(ApiDelta::Control(ControlChunk::InferenceError {
+                        code: code.as_u16(),
+                    }))
+                    .await;
+            }
             return;
         };
         tracing::debug!("Created stream.");

@@ -57,6 +57,14 @@ pub async fn handler(
         .iter()
         .find(|model| model.identifier == payload.model)
         .cloned()
+        .or_else(|| {
+            state
+                .models()
+                .paid_models()
+                .iter()
+                .find(|model| model.identifier == payload.model)
+                .cloned()
+        })
     else {
         return (
             StatusCode::BAD_REQUEST,

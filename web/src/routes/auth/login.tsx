@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router";
+import { NavLink } from "react-router";
 import { Logo } from "../../components/logo";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -16,7 +16,6 @@ export interface Inputs {
 }
 
 export function Login() {
-  const navigate = useNavigate();
   const updateUser = useAuthStore(state => state.updateUser);
   const {
     register,
@@ -32,7 +31,7 @@ export function Login() {
         return;
       }
       updateUser(result);
-      navigate("/");
+      window.location.href = "/";
     })
 
   };

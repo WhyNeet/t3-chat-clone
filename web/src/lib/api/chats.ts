@@ -35,7 +35,7 @@ export async function renameChat(id: string, name: string): Promise<void> {
   await fetch(`${BACKEND_URI}/chats/${id}/rename`, {
     credentials: "include",
     method: "POST",
-    body: JSON.stringify(name),
+    body: JSON.stringify({ name }),
     headers: {
       "Content-Type": "application/json",
     },

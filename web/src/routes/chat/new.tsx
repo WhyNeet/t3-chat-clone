@@ -32,7 +32,7 @@ export function NewChat() {
 
   return (
     <div className="h-full w-full flex items-center justify-center px-4 sm:px-8 md:px-10 lg:px-16">
-      <div className="max-w-3xl w-full">
+      <div className="max-w-3xl w-full animate-in zoom-in-95 fade-in duration-200">
         <h1 className="text-2xl font-bold font-display">Hello there!</h1>
         <p className="text-pink-900 font-display mb-4">
           What will you do today?

@@ -2,29 +2,6 @@ import { create } from "zustand";
 import type { Chat } from "../model/chat";
 import type { ChatMessage } from "../model/message";
 
-// export interface ChatsStore {
-//   chats: Chat[] | null;
-//   state: ChatsState;
-//   error: string | null;
-//   updateChats: (chats: Chat[]) => void;
-//   addChat: (chat: Chat) => void;
-//   updateError: (error: string) => void;
-// }
-
-// export enum ChatsState {
-//   Loading = 0,
-//   Loaded = 1,
-// }
-
-// export const useChatsStore = create<ChatsStore>((set) => ({
-//   chats: null,
-//   state: ChatsState.Loading,
-//   error: null,
-//   updateChats: (chats) => set({ chats, state: ChatsState.Loaded }),
-//   addChat: (chat) => set(({ chats }) => ({ chats: [...(chats ?? []), chat] })),
-//   updateError: (error) => set({ error }),
-// }));
-
 export type ChatState =
   | { status: "idle" }
   | { status: "loading" }
@@ -75,6 +52,7 @@ export const useChatsStore = create<ChatStore>((set, get) => ({
   pendingMessages: {},
   isFetching: true,
   renameChat: (id, name) => {
+    console.log(get().chats, id);
     set((state) => ({
       chats: {
         ...state.chats,

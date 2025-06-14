@@ -87,6 +87,14 @@ export function Prompt() {
     }
   };
 
+  useEffect(() => {
+    window.addEventListener("keydown", (e) => {
+      if (e.metaKey && e.key === "Enter") {
+        sendMessage();
+      }
+    })
+  })
+
   if (!isAuthorized) return <></>;
 
   return (

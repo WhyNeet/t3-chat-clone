@@ -79,6 +79,7 @@ export const Message = forwardRef<
           {message.content}
         </Markdown>
       </div>
+      {message.model ? <div className="h-2"></div> : null}
     </div>
   );
 });

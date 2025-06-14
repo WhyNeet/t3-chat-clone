@@ -1,4 +1,4 @@
-import { Check, Plus, X } from "lucide-react";
+import { Check, ChevronRight, Plus, X } from "lucide-react";
 import { AuthState, useAuthStore } from "../../lib/state/auth";
 import { NavLink } from "react-router";
 import { useState } from "react";
@@ -38,11 +38,11 @@ export function KeysSettings() {
         <div className="flex items-center gap-2 mb-4 font-display text-pink-950/40 text-sm font-medium">
           <NavLink
             to="/settings"
-            className="text-pink-950/40! underline underline-offset-6"
+            className="text-pink-950/40! underline"
           >
             Settings
           </NavLink>{" "}
-          /
+          <ChevronRight className="h-3 w-3 stroke-3 translate-y-[1px]" />
         </div>
         <h1 className="text-2xl font-bold font-display">Keys</h1>
         <p className="mb-4 text-pink-900 font-display">Your keys are encrypted and stored in primary database and cache.</p>

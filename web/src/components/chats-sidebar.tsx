@@ -11,11 +11,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { deleteChat } from "../lib/api/chats";
+import { deleteChat, renameChat } from "../lib/api/chats";
 import { useNavigate } from "react-router";
 import { logout } from "../lib/api/auth";
 import { useState } from "react";
 import { create } from "zustand";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { Input } from "./ui/input";
 
 export const useSidebarStore = create<{
   isOpen: boolean;
@@ -36,11 +38,21 @@ export function ChatsSidebar() {
   const isUserLoading = useAuthStore(
     (state) => state.state === AuthState.Loading,
   );
+  const renameChatState = useChatsStore(state => state.renameChat);
   const deleteChatState = useChatsStore((state) => state.deleteChat);
   const chats = useChatsStore((state) => state.chats);
   const isLoading = useChatsStore((state) => state.isFetching);
   const user = useAuthStore((state) => state.user);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [currentRenameId, setCurrentRenameId] = useState<string | null>(null);
+  const [currentRename, setCurrentRename] = useState("");
+
+  const handleRenameChat = async () => {
+    await renameChat(currentRenameId!, currentRename);
+    renameChatState(currentRenameId!, currentRename);
+    setRenameDialogOpen(false);
+  }
 
   const handleDeleteChat = async (id: string) => {
     await deleteChat(id);
@@ -57,7 +69,7 @@ export function ChatsSidebar() {
 
   return (
     <aside className="min-w-72 max-w-72 rounded-tr-3xl h-[calc(100vh-0.25rem)] absolute right-0 flex flex-col">
-      <div className="p-6 pt-3 flex gap-4 items-center text-lg font-bold font-display justify-center">
+      <div className="p-6 pt-2 flex gap-4 items-center text-lg font-bold font-display justify-center">
         <Logo className="h-6 w-6 text-pink-500" />
         Why Chat
       </div>
@@ -68,7 +80,10 @@ export function ChatsSidebar() {
           </Button>
         </NavLink>
       ) : null}
-      <div id="chats-list" className="pb-20 px-3 h-full overflow-y-scroll flex flex-col">
+      <div
+        id="chats-list"
+        className="pb-20 px-3 h-full overflow-y-scroll flex flex-col"
+      >
         {user ? (
           isLoading ? (
             <div className="h-full w-full flex items-center justify-center">
@@ -76,6 +91,24 @@ export function ChatsSidebar() {
             </div>
           ) : chats ? (
             <>
+              <Dialog
+                open={renameDialogOpen}
+                onOpenChange={setRenameDialogOpen}
+              >
+                <DialogContent>
+                  <DialogTitle className="font-medium font-display text-lg">
+                    Rename Chat
+                  </DialogTitle>
+                  <Input placeholder="My Awesome Chat" value={currentRename} onBlur={() => setCurrentRename(prev => prev.trim())} onChange={e => setCurrentRename(e.currentTarget.value)} />
+                  <Button
+                    intent="primary"
+                    disabled={currentRename.trim().length === 0}
+                    onClick={handleRenameChat}
+                  >
+                    Rename
+                  </Button>
+                </DialogContent>
+              </Dialog>
               <div className="flex flex-col-reverse">
                 {Object.values(chats)
                   .reverse()
@@ -104,7 +137,14 @@ export function ChatsSidebar() {
                               className="w-56 font-display text-pink-950"
                               align="start"
                             >
-                              <DropdownMenuItem onClick={() => { }}>
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCurrentRename(chat.name ?? "New Chat");
+                                  setCurrentRenameId(chat.id);
+                                  setRenameDialogOpen(true);
+                                }}
+                              >
                                 <Pen className="h-4 w-4" />
                                 Rename
                               </DropdownMenuItem>

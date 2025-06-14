@@ -62,14 +62,6 @@ impl<Entity: Serialize + for<'a> Deserialize<'a> + Send + Sync> MongoDataAdapter
             .find_one(doc)
             .await?)
     }
-    pub async fn get_by(&self, doc: Document) -> anyhow::Result<Option<Entity>> {
-        Ok(self
-            .client
-            .database(&self.db)
-            .collection::<Entity>(&self.collection)
-            .find_one(doc)
-            .await?)
-    }
     pub async fn create(&self, entity: Entity) -> anyhow::Result<ObjectId> {
         let entity = self
             .client

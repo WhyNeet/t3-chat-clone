@@ -42,7 +42,7 @@ pub async fn handler(
     let Ok(user) = state
         .database()
         .users
-        .get_by(doc! { "email": payload.email })
+        .get(doc! { "email": payload.email })
         .await
     else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();

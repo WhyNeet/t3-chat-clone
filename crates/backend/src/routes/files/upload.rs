@@ -82,6 +82,7 @@ pub async fn handler(
             id: attachment_id,
             chat_id: chat_id,
             user_id: ObjectId::from_str(&session.user_id).unwrap(),
+            content_type: content_type.to_string(),
         })
         .await
         .is_err()

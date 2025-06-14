@@ -7,4 +7,5 @@ pub struct UserUpload {
     pub id: ObjectId,
     pub chat_id: ObjectId,
     pub user_id: ObjectId,
+    pub content_type: String,
 }

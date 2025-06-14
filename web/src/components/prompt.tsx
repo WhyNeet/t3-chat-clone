@@ -7,6 +7,7 @@ import {
   Command,
   FileText,
   Globe,
+  Key,
   Paperclip,
   SendHorizonal,
   XIcon,
@@ -46,6 +47,7 @@ export function Prompt() {
   const clearUploads = useChatsStore(state => state.clearUploads);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const keys = useServiceStore(state => state.keys);
 
   const handleUploadClick = () => {
     if (!uploadInputRef.current) return;
@@ -56,7 +58,7 @@ export function Prompt() {
     if (models) {
       const modelId = localStorage.getItem(`chat-model-${chatId}`);
       setSelectedModel(
-        models.find(({ identifier }) => identifier === modelId) ?? models[0],
+        (models.free.find(({ identifier }) => identifier === modelId) ?? models.paid.find(({ identifier }) => identifier === modelId)) ?? models.free[0],
       );
     }
   }, [models, chatId]);
@@ -100,6 +102,7 @@ export function Prompt() {
     if (!chatId) {
       const chat = await createChat();
       addChat(chat, []);
+      localStorage.setItem(`chat-model-${chatId}`, selectedModel.identifier);
       navigate(`/chat/${chat.id}`);
       sendAndSubscribe(
         chat.id,
@@ -202,18 +205,31 @@ export function Prompt() {
                   <ChevronDownIcon className="h-4 w-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 bg-white pt-4 pb-2">
+              <PopoverContent className="w-80 bg-white pt-4">
                 <h3 className="font-display font-semibold mb-2 px-4">Models</h3>
-                <div className="flex flex-col w-full px-2">
-                  {models.map((model) => (
-                    <button
-                      onClick={() => handleModelSelectorClick(model)}
-                      className="py-3 px-4 hover:bg-pink-900/10 rounded-md transition text-left cursor-pointer text-sm font-display font-medium"
-                      key={model.identifier}
-                    >
-                      {model.name}
-                    </button>
-                  ))}
+                <div className="h-[50vh] overflow-y-scroll scrollbar-none">
+                  <div className="flex flex-col w-full px-2 pb-2">
+                    {models.free.map((model) => (
+                      <button
+                        onClick={() => handleModelSelectorClick(model)}
+                        className="py-3 px-4 h-11 hover:bg-pink-900/10 rounded-md transition text-left cursor-pointer text-sm font-display font-medium whitespace-nowrap"
+                        key={model.identifier}
+                      >
+                        {model.name}
+                      </button>
+                    ))}
+                    {models.paid.map((model) => (
+                      <button
+                        onClick={() => handleModelSelectorClick(model)}
+                        disabled={keys !== null && keys.length === 0}
+                        className="py-3 px-4 h-11 pr-2 hover:bg-pink-900/10 rounded-md transition flex items-center justify-between cursor-pointer text-sm font-display font-medium disabled:opacity-60 whitespace-nowrap"
+                        key={model.identifier}
+                      >
+                        <div className="max-w-[80%] overflow-hidden overflow-ellipsis">{model.name}</div>
+                        <div className="w-7 h-7 flex items-center justify-center rounded-md bg-pink-900/20"><Key className="h-4 w-4 text-pink-900/60" /></div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </PopoverContent>
             </Popover>

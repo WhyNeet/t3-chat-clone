@@ -19,10 +19,10 @@ export function NewChat() {
     navigate(`/chat/${chat.id}`);
     sendAndSubscribe(
       chat.id,
-      models![0],
+      models!.free[0],
       {
         message: prompt,
-        model: models![0].identifier,
+        model: models!.free[0].identifier,
         reasoning: null,
         use_search: false,
       },

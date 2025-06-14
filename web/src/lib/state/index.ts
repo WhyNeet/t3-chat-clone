@@ -59,7 +59,8 @@ export async function init() {
             const model = localStorage.getItem(
               `streaming-message-${chat.id}-model`,
             );
-            const provider = models.find(m => m.name === model)!.base_url;
+            const provider_data = models.free.find(m => m.name === model) ?? models.paid.find(m => m.name === model)!;
+            const provider = provider_data.base_url;
             initPendingMessage(chat.id, model ?? "AI", isSearching);
             updatePendingMessage(chat.id, { content: message, reasoning });
             subscribeToStream(

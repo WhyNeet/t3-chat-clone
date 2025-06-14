@@ -3,13 +3,13 @@ import type { Model } from "../model/service";
 import type { ApiKey } from "../model/key";
 
 export interface ServiceStore {
-  models: Model[] | null;
+  models: { free: Model[], paid: Model[] } | null;
   keys: ApiKey[] | null;
   setKeys: (keys: ApiKey[]) => void;
   removeKey: (id: string) => void;
   addKey: (key: ApiKey) => void;
   inferenceError: Record<string, number>; // Provier name -> error
-  setModels: (models: Model[]) => void;
+  setModels: (models: { free: Model[], paid: Model[] }) => void;
   setInferenceError: (provider: string, code: number) => void;
 }
 

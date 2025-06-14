@@ -54,8 +54,9 @@ pub async fn handler(
         )
             .into_response();
     };
+    let content_type = content_type.to_string();
 
-    if !["image/jpeg", "image/png", "application/pdf"].contains(&content_type) {
+    if !["image/jpeg", "image/png", "application/pdf"].contains(&content_type.as_str()) {
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({ "error": "Invalid file content type." })),
@@ -71,31 +72,6 @@ pub async fn handler(
             .into_response();
     };
 
-    // create UserUpload
-
-    let attachment_id = stream.id().as_object_id().unwrap();
-
-    if state
-        .database()
-        .uploads
-        .create(UserUpload {
-            id: attachment_id,
-            chat_id: chat_id,
-            user_id: ObjectId::from_str(&session.user_id).unwrap(),
-            content_type: content_type.to_string(),
-        })
-        .await
-        .is_err()
-    {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": "Failed to create upload." })),
-        )
-            .into_response();
-    }
-
-    // created UserUpload
-
     let file_stream = file.into_stream();
 
     let mut reader = StreamReader::new(
@@ -103,6 +79,7 @@ pub async fn handler(
             .map(|result| result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))),
     );
 
+    let mut size = 0;
     // Buffer to hold chunks
     let mut buffer = [0u8; 64 * 1024];
 
@@ -110,6 +87,15 @@ pub async fn handler(
         match reader.read(&mut buffer).await {
             Ok(0) => break, // End of stream
             Ok(n) => {
+                size += n;
+                if size > 1_000_000 {
+                    stream.abort().await.unwrap();
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(serde_json::json!({ "error": "File too large." })),
+                    )
+                        .into_response();
+                }
                 // Write chunk into GridFS stream
                 if let Err(e) = stream.write(&buffer[..n]).await {
                     return (
@@ -140,6 +126,31 @@ pub async fn handler(
         )
             .into_response();
     }
+
+    // create UserUpload
+
+    let attachment_id = stream.id().as_object_id().unwrap();
+
+    if state
+        .database()
+        .uploads
+        .create(UserUpload {
+            id: attachment_id,
+            chat_id: chat_id,
+            user_id: ObjectId::from_str(&session.user_id).unwrap(),
+            content_type: content_type.to_string(),
+        })
+        .await
+        .is_err()
+    {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": "Failed to create upload." })),
+        )
+            .into_response();
+    }
+
+    // created UserUpload
 
     (
         StatusCode::OK,

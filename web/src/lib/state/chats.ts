@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Chat } from "../model/chat";
 import type { ChatMessage } from "../model/message";
+import type { UserUpload } from "../model/upload";
 
 export type ChatState =
   | { status: "idle" }
@@ -28,6 +29,11 @@ export interface ChatStore {
       search: boolean;
     } | null
   >; // id -> pending message string
+  uploads: Record<string, UserUpload[]>;
+  addUpload: (id: string, upload: UserUpload) => void;
+  removeUpload: (id: string, fileId: string) => void;
+  clearUploads: (id: string) => void;
+  setUploads: (id: string, uploads: UserUpload[]) => void;
   isFetching: boolean;
   deleteChat: (id: string) => void;
   renameChat: (id: string, name: string) => void;
@@ -50,7 +56,25 @@ export interface ChatStore {
 export const useChatsStore = create<ChatStore>((set, get) => ({
   chats: {},
   pendingMessages: {},
+  uploads: {},
   isFetching: true,
+  clearUploads: (id) => set(state => ({ uploads: { ...state.uploads, [id]: [] } })),
+  addUpload: (id, upload) =>
+    set((state) => ({
+      uploads: {
+        ...state.uploads,
+        [id]: [...(state.uploads[id] ?? []), upload],
+      },
+    })),
+  removeUpload: (id, fileId) =>
+    set((state) => ({
+      uploads: {
+        ...state.uploads,
+        [id]: (state.uploads[id] ?? []).filter((file) => file.id !== fileId),
+      },
+    })),
+  setUploads: (id, uploads) =>
+    set((state) => ({ uploads: { ...state.uploads, [id]: uploads } })),
   renameChat: (id, name) => {
     console.log(get().chats, id);
     set((state) => ({

@@ -3,7 +3,8 @@ import { Role, type ChatMessage } from "../lib/model/message";
 import { cn } from "./utils";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, FileText } from "lucide-react";
+import { getFileUri } from "../lib/api/files";
 
 export const Message = forwardRef<
   HTMLDivElement,
@@ -14,12 +15,28 @@ export const Message = forwardRef<
   return (
     <div
       className={cn(
-        `mb-2 p-4 border border-transparent relative hover:border-pink-950 rounded-lg ${message.role === Role.User ? "self-end" : ""}`,
+        `mb-2 p-4 border border-transparent relative hover:border-pink-950/20 rounded-lg ${message.role === Role.User ? "self-end" : ""}`,
+        message.role === Role.User ? "bg-pink-50" : "",
         className,
       )}
       {...props}
       ref={ref}
     >
+
+      {message.content.length > 1 ? <div className="flex gap-2 mb-2">
+        {message.content.slice(1).map(content => {
+          switch (content.type) {
+            case "Image":
+              return <div key={content.id} className="rounded-lg overflow-hidden max-h-64 min-w-64 w-full flex items-center bg-white justify-center border-2 border-pink-900/20">
+                <img src={getFileUri(message.chat_id, content.id)} className="h-auto max-h-64 w-full bg-contain bg-no-repeat bg-center" />
+              </div>
+            case "Pdf":
+              return <a href={getFileUri(message.chat_id, content.id)} target="_blank" key={content.id} className="rounded-lg overflow-hidden p-4 border border-pink-900/20 w-64 bg-white flex justify-start items-center gap-2 text-sm text-pink-900! font-medium font-display">
+                <FileText className="h-6 w-6 text-pink-900" />
+                PDF Attachment
+              </a>
+          }
+        })}</div> : null}
       {message.model ? <div className="absolute px-2 py-1 rounded-lg bg-white h-8 -bottom-4 left-4 text-sm border border-pink-900/10 font-display text-pink-900/80">{message.model}</div> : null}
       {message.reasoning ? (
         <div
@@ -76,7 +93,7 @@ export const Message = forwardRef<
             },
           }}
         >
-          {message.content}
+          {(message.content[0] as unknown as Record<string, string>)["value"]}
         </Markdown>
       </div>
       {message.model ? <div className="h-2"></div> : null}

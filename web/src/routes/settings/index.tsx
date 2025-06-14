@@ -17,7 +17,7 @@ export function Settings() {
             <Fragment key={name}>
               <button
                 onClick={() => navigate(path)}
-                className="font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left w-full flex items-center gap-2 active:scale-[0.97] transition"
+                className="font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left w-full flex items-center gap-2 active:scale-[0.97] transition-[scale]"
               >
                 <Icon className="h-4 w-4" />
                 {name}

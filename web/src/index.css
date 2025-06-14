@@ -49,10 +49,14 @@ span.size-48 {
 }
 
 code {
-  font-family: "JetBrains Mono Variable" !important, var(--font-mono);
+  font-family: "JetBrains Mono Variable", var(--font-mono) !important;
 }
 
 
 #chats-list::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
   display: none;
 }

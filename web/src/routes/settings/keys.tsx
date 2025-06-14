@@ -45,7 +45,7 @@ export function KeysSettings() {
           <ChevronRight className="h-3 w-3 stroke-3 translate-y-[1px]" />
         </div>
         <h1 className="text-2xl font-bold font-display">Keys</h1>
-        <p className="mb-4 text-pink-900 font-display">Your keys are encrypted and stored in primary database and cache.</p>
+        <p className="mb-4 text-pink-900 font-display">Add your own key to access paid models.</p>
         {authLoading ? <div>
           <Loader className="text-pink-900" />
         </div> : isAuthorized ? keys ? (
@@ -73,11 +73,12 @@ export function KeysSettings() {
               ) : null}
               {isAddingKey || keys.length > 0 ? null : <button
                 onClick={() => setIsAddingKey(true)}
-                className="font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left w-full flex items-center gap-2 active:scale-[0.97] transition"
+                className="font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left w-full flex items-center gap-2 active:scale-[0.97] transition-[scale]"
               >
                 <Plus className="h-4 w-4" />
                 Add OpenRouter Key
               </button>}
+              <p className="font-display text-sm mt-6 text-pink-900/60">Your keys are encrypted and stored in primary database and cache.</p>
             </div>
           </>
         ) : <div>

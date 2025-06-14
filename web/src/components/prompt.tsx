@@ -1,11 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { Button } from "../components/ui/button";
 import {
   Brain,
   ChevronDownIcon,
+  CircleAlert,
   Command,
+  FileText,
   Globe,
+  Paperclip,
   SendHorizonal,
+  XIcon,
 } from "lucide-react";
 import { useParams } from "react-router";
 import { sendAndSubscribe } from "../lib/api/messages";
@@ -18,6 +22,8 @@ import { cn } from "./utils";
 import { useServiceStore } from "../lib/state/service";
 import type { Model } from "../lib/model/service";
 import { useAuthStore } from "../lib/state/auth";
+import { toast } from "sonner";
+import { deleteFile, getFileUri, uploadFile } from "../lib/api/files";
 
 export function Prompt() {
   const navigate = useNavigate();
@@ -32,6 +38,19 @@ export function Prompt() {
   const [isReasoning, setIsReasoning] = useState(false);
   const [selectedModel, setSelectedModel] = useState<Model>(null!);
   const [useSearch, setUseSearch] = useState(false);
+  const uploads = useChatsStore((state) =>
+    chatId ? state.uploads[chatId] : state.uploads["nochat"],
+  );
+  const addUpload = useChatsStore((state) => state.addUpload);
+  const removeUpload = useChatsStore((state) => state.removeUpload);
+  const clearUploads = useChatsStore(state => state.clearUploads);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleUploadClick = () => {
+    if (!uploadInputRef.current) return;
+    uploadInputRef.current.click();
+  };
 
   useEffect(() => {
     if (models) {
@@ -52,6 +71,30 @@ export function Prompt() {
     setIsModelSelectorOpen(false);
   };
 
+  const handleFileInputChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.currentTarget.files![0];
+    if (file.size > 1000000) {
+      toast(<div className="flex items-center gap-2">
+        <CircleAlert className="h-5 w-5" />
+        File is too large (max 1mb).
+      </div>, { className: "bg-red-50! border border-red-500! rounded-lg text-red-500! font-display font-medium" });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setIsUploading(true);
+    const upload = await uploadFile(chatId ?? null, formData);
+    addUpload("nochat", upload);
+    setIsUploading(false);
+  }
+
+  const handleFileRemove = async (chatId: string | null, fileId: string) => {
+    await deleteFile(chatId, fileId);
+    removeUpload(chatId ?? "nochat", fileId);
+  }
+
   const sendMessage = async () => {
     setIsRequesting(true);
     if (!chatId) {
@@ -69,6 +112,7 @@ export function Prompt() {
         },
         () => setIsRequesting(false),
       );
+      clearUploads("nochat");
       setMessage("");
     } else {
       navigate(`/chat/${chatId}`);
@@ -84,21 +128,39 @@ export function Prompt() {
         () => setIsRequesting(false),
       );
       setMessage("");
+      clearUploads(chatId);
     }
   };
 
   useEffect(() => {
-    window.addEventListener("keydown", (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.metaKey && e.key === "Enter") {
         sendMessage();
       }
-    })
-  })
+    };
+    window.addEventListener("keydown", handler);
+
+    return () => window.removeEventListener("keydown", handler);
+  });
 
   if (!isAuthorized) return <></>;
 
   return (
     <div className="w-full max-w-4xl bg-pink-50/90 backdrop-blur-3xl border border-b-0 border-pink-200 p-2 rounded-t-lg">
+      <div className="max-w-full overflow-x-scroll scrollbar-none">
+        {uploads && uploads.length > 0 ? <div className="flex gap-2 mb-2">
+          {uploads.map(upload => <div key={upload.id} className="rounded-lg h-20 min-w-20 group relative overflow-hidden">
+            <div className="h-20 min-w-20 aspect-square overflow-hidden rounded-md transition group-hover:brightness-50 flex items-center justify-center bg-white">
+              {upload.content_type.startsWith("image/") ? <img src={getFileUri(chatId ?? null, upload.id)} className="h-20 min-w-fit" />
+                : <FileText className="h-7 w-7 text-pink-900" />}</div>
+            <button onClick={() => handleFileRemove(upload.chat_id, upload.id)}
+              className="absolute top-2 left-2 text-white cursor-pointer transition opacity-0 group-hover:opacity-100"
+            >
+              <XIcon className="h-5 w-5" />
+            </button>
+          </div>)}
+        </div> : null}
+      </div>
       <div className="flex gap-2">
         <textarea
           value={message}
@@ -181,9 +243,22 @@ export function Prompt() {
               <Globe className="h-4 w-4" />
               Web Search
             </Button>
+            <Button
+              onClick={() => handleUploadClick()}
+              intent="ghost"
+              size="square"
+              disabled={isUploading}
+              rounded="circle"
+              className={cn(
+                "gap-1.5 border-pink-900/20 border text-pink-900 transition h-[30px] w-[30px] disabled:opacity-80 disabled:hover:bg-transparent disabled:cursor-not-allowed",
+              )}
+            >
+              {isUploading ? <Loader className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />}
+            </Button>
           </>
         ) : null}
       </div>
+      <input onChange={handleFileInputChange} ref={uploadInputRef} className="hidden" type="file" multiple={false} accept="image/png, image/jpeg, application/pdf" />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { AlertCircle, CircleAlert, Globe, Sparkle } from "lucide-react";
 import { useServiceStore } from "../../lib/state/service";
 import { Prompt } from "../../components/prompt";
 import { useLocation } from "react-router";
+import { listUnsentFiles } from "../../lib/api/files";
 
 export function Chat() {
   const scrollWrapper = useRef<HTMLDivElement>(null);
@@ -47,6 +48,7 @@ export function Chat() {
     (state) => state.inferenceError["openrouter"] ?? null,
   );
   const location = useLocation();
+  const setUploads = useChatsStore(state => state.setUploads);
 
   useEffect(() => {
     if (!scrollWrapper.current || !scrollableContainer.current) return;
@@ -136,6 +138,9 @@ export function Chat() {
   useEffect(() => {
     if (!chatId || !chatExists) return;
     if (!chatLoading && !messages) {
+      listUnsentFiles(chatId).then(uploads => {
+        setUploads(chatId, uploads);
+      });
       // setIsLoading(true);
       setChatState(chatId, { status: "loading" });
       fetchChatMessages(chatId, {
@@ -197,7 +202,7 @@ export function Chat() {
           <Message
             message={{
               chat_id: chatId,
-              content: pendingMessage.content,
+              content: [{ type: "Text", value: pendingMessage.content }],
               model: pendingMessage.model,
               reasoning: pendingMessage.reasoning,
               id: "pending-message",

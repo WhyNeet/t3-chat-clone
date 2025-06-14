@@ -1,6 +1,7 @@
 import { me } from "../api/auth";
 import { chats } from "../api/chats";
 import { is, subscribeToStream } from "../api/completions";
+import { listUnsentFiles } from "../api/files";
 import { listKeys } from "../api/keys";
 import { listModels } from "../api/service";
 import { useAuthStore } from "./auth";
@@ -28,7 +29,11 @@ export async function init() {
     initPendingMessage,
     finishWebSearch,
     updateChatName,
+    setUploads
   } = useChatsStore.getState();
+  listUnsentFiles(null).then(uploads => {
+    setUploads("nochat", uploads);
+  });
   useAuthStore.subscribe((store, prev) => {
     if (store.user && !prev.user) {
       chats({
@@ -36,6 +41,9 @@ export async function init() {
         take: Math.round((window.innerHeight * 1.5) / 50),
       }).then((chats) => {
         for (const chat of chats) {
+          // listUnsentFiles(chat.id).then(uploads => {
+          //   setUploads(chat.id, uploads);
+          // });
           initializeChat(chat);
           const streamId = localStorage.getItem(`stream-${chat.id}`);
           if (streamId) {

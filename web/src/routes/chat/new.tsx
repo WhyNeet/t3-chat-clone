@@ -71,7 +71,7 @@ export function NewChat() {
             <Fragment key={prompt}>
               <button
                 onClick={() => sendPrompt(prompt)}
-                className="w-full font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left active:scale-[0.99] transition"
+                className="w-full font-display px-3 py-2 rounded-lg text-pink-900 hover:bg-pink-50 cursor-pointer text-left active:scale-[0.99] transition-[scale]"
               >
                 {prompt}
               </button>

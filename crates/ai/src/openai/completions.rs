@@ -11,15 +11,13 @@ pub struct OpenAIChatCompletionRequest {
     pub max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<OpenAIChatCompletionRequestReasoning>,
-    // #[serde(skip_serializing_if = "Option::is_none")]
-    // pub plugins: Option<OpenRouterRequestPlugins>,
+    pub plugins: Vec<OpenRouterRequestPlugin>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct OpenRouterRequestPlugins {
+pub struct OpenRouterRequestPlugin {
     pub id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pdf: Option<OpenRouterRequestPdfPlugin>,
+    pub pdf: OpenRouterRequestPdfPlugin,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -46,8 +44,15 @@ pub enum OpenAIMessageContent {
     #[serde(rename = "image_url")]
     ImageUrl { image_url: OpenAIMessageImageUrl },
     #[serde(rename = "file")]
-    File { filename: String, file_data: String },
+    File { file: OpenAIMessageContentFile },
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenAIMessageContentFile {
+    pub filename: String,
+    pub file_data: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OpenAIMessageImageUrl {
     pub url: String,

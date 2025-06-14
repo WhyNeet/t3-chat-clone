@@ -9,7 +9,7 @@ use crate::openai::completions::{
     OpenAIMessage, OpenAIPromptCompletionRequest, OpenAIPromptCompletionResponse, ReasoningEffort,
 };
 
-use super::completions::OpenRouterRequestPlugins;
+use super::completions::OpenRouterRequestPlugin;
 
 #[derive(Debug, Clone)]
 pub struct OpenAIClient {
@@ -28,7 +28,7 @@ impl OpenAIClient {
         messages: Vec<OpenAIMessage>,
         temperature: Option<f32>,
         reasoning_effort: Option<ReasoningEffort>,
-        plugins: Option<OpenRouterRequestPlugins>,
+        plugins: Vec<OpenRouterRequestPlugin>,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<OpenAICompletionChunk>>> {
         let client = Client::new();
 
@@ -40,7 +40,7 @@ impl OpenAIClient {
             max_tokens: None,
             reasoning: reasoning_effort
                 .map(|effort| OpenAIChatCompletionRequestReasoning { effort }),
-            // plugins,
+            plugins,
         };
 
         let request = client
@@ -50,7 +50,8 @@ impl OpenAIClient {
             .send()
             .await?;
         if request.status() != StatusCode::OK {
-            anyhow::bail!(request.status())
+            let status = request.status();
+            anyhow::bail!(status)
         }
         let bytes_stream = request.bytes_stream();
 

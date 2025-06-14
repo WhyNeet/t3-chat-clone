@@ -20,7 +20,7 @@ pub async fn handler(
     let Ok(uploads) = state
         .database()
         .uploads
-        .get_many(doc! { "chat_id": chat_id, "user_id": user_id })
+        .get_many(doc! { "chat_id": chat_id, "user_id": user_id, "is_sent": false })
         .await
     else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -49,7 +49,7 @@ pub async fn no_chat_id_handler(
     let Ok(uploads) = state
         .database()
         .uploads
-        .get_many(doc! { "chat_id": null, "user_id": user_id })
+        .get_many(doc! { "chat_id": null, "user_id": user_id, "is_sent": false })
         .await
     else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();

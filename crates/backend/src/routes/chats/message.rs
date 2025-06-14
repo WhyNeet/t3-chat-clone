@@ -3,8 +3,9 @@ use std::{env, str::FromStr, sync::Arc, time::Duration};
 use aes_gcm::{Aes256Gcm, Key, KeyInit, aead::AeadMut};
 use ai::openai::{
     completions::{
-        OpenAICompletionDelta, OpenAIMessage, OpenAIMessageContent, OpenAIMessageImageUrl,
-        OpenRouterRequestPdfPlugin, OpenRouterRequestPlugins, ReasoningEffort,
+        OpenAICompletionDelta, OpenAIMessage, OpenAIMessageContent, OpenAIMessageContentFile,
+        OpenAIMessageImageUrl, OpenRouterRequestPdfPlugin, OpenRouterRequestPlugin,
+        ReasoningEffort,
     },
     streaming::OpenAIClient,
 };
@@ -118,9 +119,8 @@ pub async fn handler(
                                 ),
                             },
                         },
-                        ChatMessageContent::Pdf { id } => OpenAIMessageContent::File {
-                            filename: id.to_hex(),
-                            file_data: "".to_string(),
+                        ChatMessageContent::Pdf { id } => OpenAIMessageContent::Text {
+                            text: format!("**pdf file with id: {id}**"),
                         },
                     })
                     .collect(),
@@ -136,9 +136,9 @@ pub async fn handler(
     // FILES
 
     let files_chat_id = if messages.is_empty() {
-        Some(chat.id.unwrap())
-    } else {
         None
+    } else {
+        Some(chat.id.unwrap())
     };
     let Ok(files) = state
         .database()
@@ -389,8 +389,13 @@ pub async fn handler(
                             let mut contents = vec![];
                             file.read_to_end(&mut contents).await.unwrap();
                             OpenAIMessageContent::File {
-                                filename: id.to_hex(),
-                                file_data: BASE64_STANDARD.encode(contents),
+                                file: OpenAIMessageContentFile {
+                                    filename: id.to_hex(),
+                                    file_data: format!(
+                                        "data:application/pdf;base64,{}",
+                                        BASE64_STANDARD.encode(contents)
+                                    ),
+                                },
                             }
                         }
                     }),
@@ -425,12 +430,12 @@ pub async fn handler(
                 messages,
                 Some(0.7),
                 payload.reasoning,
-                Some(OpenRouterRequestPlugins {
+                vec![OpenRouterRequestPlugin {
                     id: "file-parser".to_string(),
-                    pdf: Some(OpenRouterRequestPdfPlugin {
+                    pdf: OpenRouterRequestPdfPlugin {
                         engine: "pdf-text".to_string(),
-                    }),
-                }),
+                    },
+                }],
             )
             .await;
         let Ok(stream) = stream else {

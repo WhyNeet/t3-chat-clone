@@ -1,5 +1,5 @@
 use chrono::Utc;
-use model::message::{ChatMessageContent, Role};
+use model::message::Role;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 

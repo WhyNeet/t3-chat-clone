@@ -2,7 +2,10 @@ use std::{env, str::FromStr, sync::Arc, time::Duration};
 
 use aes_gcm::{Aes256Gcm, Key, KeyInit, aead::AeadMut};
 use ai::openai::{
-    completions::{OpenAICompletionDelta, OpenAIMessage, ReasoningEffort},
+    completions::{
+        OpenAICompletionDelta, OpenAIMessage, OpenAIMessageContent, OpenAIMessageImageUrl,
+        OpenRouterRequestPdfPlugin, OpenRouterRequestPlugins, ReasoningEffort,
+    },
     streaming::OpenAIClient,
 };
 use axum::{
@@ -11,14 +14,16 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::Utc;
-use futures::{StreamExt, TryStreamExt};
+use futures::{AsyncReadExt, StreamExt, TryStreamExt, future::join_all};
 use hmac::digest::generic_array::GenericArray;
 use model::{
     key::UserApiKey,
-    message::{ChatMessage, Role},
+    message::{ChatMessage, ChatMessageContent, Role},
+    upload::UserUpload,
 };
-use mongodb::bson::{doc, oid::ObjectId};
+use mongodb::bson::{Bson, doc, oid::ObjectId};
 use redis_om::HashModel;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -26,7 +31,7 @@ use uuid::Uuid;
 
 use crate::{
     middleware::auth::Auth,
-    payload::chat::ChatMessagePayload,
+    payload::chat::{ChatMessageContentPayload, ChatMessagePayload},
     state::{ApiDelta, AppState, ControlChunk},
 };
 
@@ -38,13 +43,13 @@ pub struct PromptCompletionPayload {
     pub use_search: bool,
 }
 
-#[axum::debug_handler]
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Path(chat_id): Path<ObjectId>,
     Auth(session): Auth,
     Json(payload): Json<PromptCompletionPayload>,
 ) -> impl IntoResponse {
+    let user_id = ObjectId::from_str(&session.user_id).unwrap();
     let Some(model) = state
         .models()
         .free_models()
@@ -76,6 +81,8 @@ pub async fn handler(
             .into_response();
     };
 
+    // MESSAGES
+
     let Ok(messages) = state
         .database()
         .messages
@@ -95,7 +102,28 @@ pub async fn handler(
         .into_iter()
         .map(|msg| {
             msg.map(|msg| OpenAIMessage {
-                content: msg.content,
+                content: msg
+                    .content
+                    .into_iter()
+                    .map(|content| match content {
+                        ChatMessageContent::Text { value } => {
+                            OpenAIMessageContent::Text { text: value }
+                        }
+                        ChatMessageContent::Image { id } => OpenAIMessageContent::ImageUrl {
+                            image_url: OpenAIMessageImageUrl {
+                                url: format!(
+                                    "https://t3-chat-clone.onrender.com/files/{}/{}",
+                                    chat_id.to_hex(),
+                                    id.to_hex()
+                                ),
+                            },
+                        },
+                        ChatMessageContent::Pdf { id } => OpenAIMessageContent::File {
+                            filename: id.to_hex(),
+                            file_data: "".to_string(),
+                        },
+                    })
+                    .collect(),
                 role: msg.role.to_string(),
             })
         })
@@ -104,6 +132,41 @@ pub async fn handler(
         tracing::error!("Failed to list message.");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
+
+    // FILES
+
+    let files_chat_id = if messages.is_empty() {
+        Some(chat.id.unwrap())
+    } else {
+        None
+    };
+    let Ok(files) = state
+        .database()
+        .uploads
+        .get_many(doc! { "user_id": user_id, "chat_id": files_chat_id, "is_sent": false })
+        .await
+    else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    let Ok(files) = files.try_collect::<Vec<UserUpload>>().await else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    for file in files.iter() {
+        if state
+            .database()
+            .uploads
+            .update(
+                file.id,
+                doc! { "$set": { "chat_id": chat.id.unwrap(), "is_sent": true } },
+            )
+            .await
+            .is_err()
+        {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
+
+    // API KEY
 
     let mut conn = state.redis();
 
@@ -153,9 +216,20 @@ pub async fn handler(
 
     let (tx, rx) = flume::unbounded();
 
+    let mut user_message_full_content = vec![ChatMessageContent::Text {
+        value: payload.message.clone(),
+    }];
+    for file in files.iter() {
+        if file.content_type.starts_with("image/") {
+            user_message_full_content.push(ChatMessageContent::Image { id: file.id })
+        } else {
+            user_message_full_content.push(ChatMessageContent::Pdf { id: file.id });
+        }
+    }
+
     let user_message = ChatMessage {
         id: None,
-        content: payload.message.clone(),
+        content: user_message_full_content.clone(),
         model: None,
         reasoning: None,
         role: Role::User,
@@ -207,8 +281,6 @@ pub async fn handler(
         .await
         .unwrap();
 
-    let user_message_content = user_message.content.clone();
-
     let stream_id = Uuid::new_v4();
     let task_state = Arc::clone(&state);
     tokio::spawn(async move {
@@ -246,26 +318,90 @@ pub async fn handler(
                 })
                 .collect();
 
-            format!(
+            let mut user_message_content = user_message.content.clone();
+
+            let prompt_content = format!(
                 r#"Use the following search results to answer the query. If information is insufficient, state that.;
               Search Results:\n{context};
               Query: {};
               \nAnswer:"#,
-                user_message.content.trim()
-            )
+                match &user_message.content[0] {
+                    ChatMessageContent::Text { value } => value,
+                    _ => unreachable!(),
+                }
+                .trim()
+            );
+
+            let new_first_message = ChatMessageContent::Text {
+                value: prompt_content,
+            };
+            user_message_content[0] = new_first_message;
+
+            user_message_content
         } else {
             user_message.content.clone()
         };
 
         messages.push(OpenAIMessage {
             role: "user".to_string(),
-            content: message_for_assistant,
+            content: join_all(
+                message_for_assistant
+                    .into_iter()
+                    .map(async |msg| match msg {
+                        ChatMessageContent::Text { value } => {
+                            OpenAIMessageContent::Text { text: value }
+                        }
+                        ChatMessageContent::Image { id } => {
+                            // if cfg!(debug_assertions) {
+                            let mut file = task_state
+                                .bucket()
+                                .open_download_stream(Bson::ObjectId(id))
+                                .await
+                                .unwrap();
+                            let mut contents = vec![];
+                            file.read_to_end(&mut contents).await.unwrap();
+                            OpenAIMessageContent::ImageUrl {
+                                image_url: OpenAIMessageImageUrl {
+                                    url: format!(
+                                        "data:image/jpeg;base64,{}",
+                                        BASE64_STANDARD.encode(contents)
+                                    ),
+                                },
+                            }
+                            // } else {
+                            //     OpenAIMessageContent::ImageUrl {
+                            //         image_url: OpenAIMessageImageUrl {
+                            //             url: format!(
+                            //                 "https://t3-chat-clone.onrender.com/files/{}/{}",
+                            //                 chat_id.to_hex(),
+                            //                 id.to_hex()
+                            //             ),
+                            //         },
+                            //     }
+                            // }
+                        }
+                        ChatMessageContent::Pdf { id } => {
+                            let mut file = task_state
+                                .bucket()
+                                .open_download_stream(Bson::ObjectId(id))
+                                .await
+                                .unwrap();
+                            let mut contents = vec![];
+                            file.read_to_end(&mut contents).await.unwrap();
+                            OpenAIMessageContent::File {
+                                filename: id.to_hex(),
+                                file_data: BASE64_STANDARD.encode(contents),
+                            }
+                        }
+                    }),
+            )
+            .await,
         });
 
         let assistant_message_id = ObjectId::new();
         let assistant_message = ChatMessage {
             id: Some(assistant_message_id),
-            content: String::new(),
+            content: vec![],
             model: Some(model.name.clone()),
             role: Role::Assistant,
             reasoning: None,
@@ -282,8 +418,20 @@ pub async fn handler(
                 .await
                 .unwrap();
         });
+
         let stream = client
-            .completion(payload.model, messages, Some(0.7), payload.reasoning)
+            .completion(
+                payload.model,
+                messages,
+                Some(0.7),
+                payload.reasoning,
+                Some(OpenRouterRequestPlugins {
+                    id: "file-parser".to_string(),
+                    pdf: Some(OpenRouterRequestPdfPlugin {
+                        engine: "pdf-text".to_string(),
+                    }),
+                }),
+            )
             .await;
         let Ok(stream) = stream else {
             let error = stream.err().unwrap();
@@ -306,7 +454,7 @@ pub async fn handler(
         let mut reasoning_acc: Option<String> = None;
         let mut content_acc = String::new();
         let mut iteration_start = Utc::now().timestamp_millis();
-        // let mut is_thinking_content = false;
+
         while let Ok(chunk) = stream.try_next().await {
             let Some(chunk) = chunk else { break };
             let delta = &chunk.choices.get(0).unwrap().delta;
@@ -332,37 +480,6 @@ pub async fn handler(
                 }
             }
 
-            // if let Some(mut delta_content) = delta_content.take() {
-            //     if delta_content.starts_with("<think>") {
-            //         is_thinking_content = true;
-            //         delta_content = delta_content[7..].to_string();
-            //     }
-
-            //     if !is_thinking_content {
-            //         content.push_str(&delta_content);
-            //         content_acc.push_str(&delta_content);
-            //     } else {
-            //         let mut spl = delta_content.split("</think>");
-            //         let thoughts = spl.next().unwrap();
-            //         let delta_content = spl.next();
-            //         if let Some(ref mut reasoning) = reasoning {
-            //             reasoning.push_str(thoughts);
-            //         } else {
-            //             reasoning = Some(thoughts.to_string())
-            //         }
-
-            //         if reasoning_acc.is_none() {
-            //             reasoning_acc = Some(thoughts.to_string());
-            //         } else {
-            //             reasoning_acc.as_mut().unwrap().push_str(thoughts);
-            //         }
-
-            //         if let Some(delta_content) = delta_content {
-            //             content.push_str(delta_content);
-            //             content_acc.push_str(delta_content);
-            //         }
-            //     }
-            // }
             if Utc::now().timestamp_millis() - iteration_start >= 100 {
                 tx.send_async(ApiDelta::Chunk(OpenAICompletionDelta {
                     content: Some(content_acc.clone()),
@@ -385,9 +502,10 @@ pub async fn handler(
             .unwrap();
         }
         tracing::debug!("Sending done chunk");
+        let assistant_message_content = vec![ChatMessageContent::Text { value: content }];
         tx.send(ApiDelta::Control(ControlChunk::Done {
             message: ChatMessage {
-                content: content.clone(),
+                content: assistant_message_content.clone(),
                 reasoning: reasoning.clone(),
                 ..assistant_message
             },
@@ -398,7 +516,7 @@ pub async fn handler(
             .messages
             .update(
                 assistant_message_id,
-                doc! { "$set": { "content": content, "reasoning": reasoning } },
+                doc! { "$set": { "content": assistant_message_content, "reasoning": reasoning } },
             )
             .await
             .unwrap();
@@ -412,6 +530,15 @@ pub async fn handler(
 
     state.insert_stream(stream_id, rx);
 
+    let content = user_message_full_content
+        .into_iter()
+        .map(|message| match message {
+            ChatMessageContent::Text { value } => ChatMessageContentPayload::Text { value },
+            ChatMessageContent::Image { id } => ChatMessageContentPayload::Image { id },
+            ChatMessageContent::Pdf { id } => ChatMessageContentPayload::Pdf { id },
+        })
+        .collect();
+
     (
         StatusCode::OK,
         Json(json!({
@@ -419,7 +546,7 @@ pub async fn handler(
           "user_message": ChatMessagePayload {
             id: user_message_id,
             chat_id: user_message.chat_id,
-            content: user_message_content,
+            content,
             model: None,
             reasoning: None,
             role: user_message.role,

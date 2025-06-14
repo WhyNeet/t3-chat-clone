@@ -40,3 +40,32 @@ pub async fn handler(
 
     (StatusCode::OK, Json(uploads)).into_response()
 }
+
+pub async fn no_chat_id_handler(
+    State(state): State<Arc<AppState>>,
+    Auth(session): Auth,
+) -> impl IntoResponse {
+    let user_id = ObjectId::from_str(&session.user_id).unwrap();
+    let Ok(uploads) = state
+        .database()
+        .uploads
+        .get_many(doc! { "chat_id": null, "user_id": user_id })
+        .await
+    else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    let Ok(uploads) = uploads
+        .map_ok(|upload| UserUploadPayload {
+            id: upload.id,
+            chat_id: upload.chat_id,
+            user_id: upload.user_id,
+            content_type: upload.content_type,
+        })
+        .try_collect::<Vec<UserUploadPayload>>()
+        .await
+    else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    (StatusCode::OK, Json(uploads)).into_response()
+}

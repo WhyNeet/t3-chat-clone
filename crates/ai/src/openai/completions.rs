@@ -11,6 +11,20 @@ pub struct OpenAIChatCompletionRequest {
     pub max_tokens: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<OpenAIChatCompletionRequestReasoning>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub plugins: Option<OpenRouterRequestPlugins>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenRouterRequestPlugins {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pdf: Option<OpenRouterRequestPdfPlugin>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenRouterRequestPdfPlugin {
+    pub engine: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,7 +35,22 @@ pub struct OpenAIChatCompletionRequestReasoning {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OpenAIMessage {
     pub role: String,
-    pub content: String,
+    pub content: Vec<OpenAIMessageContent>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum OpenAIMessageContent {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "image_url")]
+    ImageUrl { image_url: OpenAIMessageImageUrl },
+    #[serde(rename = "file")]
+    File { filename: String, file_data: String },
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenAIMessageImageUrl {
+    pub url: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

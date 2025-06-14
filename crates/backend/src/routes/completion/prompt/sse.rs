@@ -6,11 +6,12 @@ use axum::{
     response::{IntoResponse, Sse, sse::Event},
 };
 use futures::StreamExt;
+use model::message::ChatMessageContent;
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    payload::chat::ChatMessagePayload,
+    payload::chat::{ChatMessageContentPayload, ChatMessagePayload},
     state::{ApiDelta, AppState, ControlChunk},
 };
 
@@ -32,7 +33,16 @@ pub async fn handler(
                     json!({ "control": { "kind": "Done", "message": ChatMessagePayload {
                       id: message.id.unwrap(),
                       chat_id: message.chat_id,
-                      content: message.content,
+                      content: message.content
+                    .into_iter()
+                    .map(|message| match message {
+                        ChatMessageContent::Text { value } => {
+                            ChatMessageContentPayload::Text { value }
+                        }
+                        ChatMessageContent::Image { id } => ChatMessageContentPayload::Image { id },
+                        ChatMessageContent::Pdf { id } => ChatMessageContentPayload::Pdf { id },
+                    })
+                    .collect(),
                       model: message.model,
                       reasoning: message.reasoning,
                       role: message.role,

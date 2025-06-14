@@ -13,31 +13,40 @@ use serde_json::json;
 use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
 
-use crate::{middleware::auth::Auth, state::AppState};
+use crate::{middleware::auth::Auth, payload::upload::UserUploadPayload, state::AppState};
 
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Auth(session): Auth,
-    Path(chat_id): Path<ObjectId>,
+    chat_id: Option<Path<ObjectId>>,
     mut multipart: Multipart,
 ) -> impl IntoResponse {
-    let Ok(chat) = state.database().chats.get_by_id(chat_id).await else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    let chat_id = chat_id.map(|c| c.0);
+    let user_id = ObjectId::from_str(&session.user_id).unwrap();
+    let _ = if let Some(chat_id) = chat_id {
+        let Ok(chat) = state.database().chats.get_by_id(chat_id).await else {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        };
+        let Some(chat) = chat else {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Chat does not exist." })),
+            )
+                .into_response();
+        };
+
+        if chat.user_id != user_id {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Chat does not belong to the user." })),
+            )
+                .into_response();
+        }
+
+        Some(chat)
+    } else {
+        None
     };
-    let Some(chat) = chat else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not exist." })),
-        )
-            .into_response();
-    };
-    if chat.user_id.to_hex() != session.user_id {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not belong to the user." })),
-        )
-            .into_response();
-    }
 
     let Ok(Some(file)) = multipart.next_field().await else {
         return (
@@ -137,8 +146,9 @@ pub async fn handler(
         .create(UserUpload {
             id: attachment_id,
             chat_id: chat_id,
-            user_id: ObjectId::from_str(&session.user_id).unwrap(),
+            user_id,
             content_type: content_type.to_string(),
+            is_sent: false,
         })
         .await
         .is_err()
@@ -154,7 +164,12 @@ pub async fn handler(
 
     (
         StatusCode::OK,
-        Json(json!({ "id": attachment_id.to_hex() })),
+        Json(UserUploadPayload {
+            id: attachment_id,
+            chat_id,
+            content_type,
+            user_id,
+        }),
     )
         .into_response()
 }

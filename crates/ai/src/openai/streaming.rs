@@ -9,6 +9,8 @@ use crate::openai::completions::{
     OpenAIMessage, OpenAIPromptCompletionRequest, OpenAIPromptCompletionResponse, ReasoningEffort,
 };
 
+use super::completions::OpenRouterRequestPlugins;
+
 #[derive(Debug, Clone)]
 pub struct OpenAIClient {
     key: String,
@@ -26,6 +28,7 @@ impl OpenAIClient {
         messages: Vec<OpenAIMessage>,
         temperature: Option<f32>,
         reasoning_effort: Option<ReasoningEffort>,
+        plugins: Option<OpenRouterRequestPlugins>,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<OpenAICompletionChunk>>> {
         let client = Client::new();
 
@@ -37,6 +40,7 @@ impl OpenAIClient {
             max_tokens: None,
             reasoning: reasoning_effort
                 .map(|effort| OpenAIChatCompletionRequestReasoning { effort }),
+            // plugins,
         };
 
         let request = client

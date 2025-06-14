@@ -11,3 +11,14 @@ where
 {
     serializer.serialize_str(&oid.to_hex())
 }
+
+pub fn serialize_option_oid<S>(oid: &Option<ObjectId>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(oid) = oid {
+        serializer.serialize_str(&oid.to_hex())
+    } else {
+        serializer.serialize_none()
+    }
+}

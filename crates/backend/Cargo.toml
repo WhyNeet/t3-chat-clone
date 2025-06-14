@@ -33,3 +33,4 @@ chrono = { version = "0.4.41", features = ["serde"] }
 reqwest = "0.12.20"
 aes-gcm = "0.10.3"
 tokio-util = "0.7.15"
+base64 = "0.22.1"

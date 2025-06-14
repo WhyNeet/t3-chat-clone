@@ -55,3 +55,45 @@ pub async fn handler(
 
     (headers, Body::from_stream(stream)).into_response()
 }
+
+pub async fn no_chat_id_handler(
+    State(state): State<Arc<AppState>>,
+    Auth(session): Auth,
+    Path(upload_id): Path<ObjectId>,
+) -> impl IntoResponse {
+    let user_id = ObjectId::from_str(&session.user_id).unwrap();
+    let Ok(upload) = state
+        .database()
+        .uploads
+        .get(doc! { "chat_id": null, "_id": upload_id, "user_id": user_id })
+        .await
+    else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+    let Some(upload) = upload else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Upload not found." })),
+        )
+            .into_response();
+    };
+
+    let Ok(stream) = state
+        .bucket()
+        .open_download_stream(Bson::ObjectId(upload.id))
+        .await
+    else {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    };
+
+    let stream = stream.compat();
+    let stream = ReaderStream::new(stream);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&upload.content_type).unwrap(),
+    );
+
+    (headers, Body::from_stream(stream)).into_response()
+}

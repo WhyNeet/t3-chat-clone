@@ -5,12 +5,17 @@ use axum::{
     response::IntoResponse,
 };
 use futures::{StreamExt, TryStreamExt};
+use model::message::ChatMessageContent;
 use mongodb::bson::{doc, oid::ObjectId};
 use serde::Deserialize;
 use serde_json::json;
 use std::{str::FromStr, sync::Arc};
 
-use crate::{middleware::auth::Auth, payload::chat::ChatMessagePayload, state::AppState};
+use crate::{
+    middleware::auth::Auth,
+    payload::chat::{ChatMessageContentPayload, ChatMessagePayload},
+    state::AppState,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct ListChatMessagesPayload {
@@ -62,7 +67,17 @@ pub async fn handler(
         .map(|message| {
             message.map(|msg| ChatMessagePayload {
                 id: msg.id.unwrap(),
-                content: msg.content,
+                content: msg
+                    .content
+                    .into_iter()
+                    .map(|message| match message {
+                        ChatMessageContent::Text { value } => {
+                            ChatMessageContentPayload::Text { value }
+                        }
+                        ChatMessageContent::Image { id } => ChatMessageContentPayload::Image { id },
+                        ChatMessageContent::Pdf { id } => ChatMessageContentPayload::Pdf { id },
+                    })
+                    .collect(),
                 model: msg.model,
                 timestamp: chat.timestamp,
                 reasoning: msg.reasoning,

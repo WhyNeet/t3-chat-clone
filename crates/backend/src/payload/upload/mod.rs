@@ -7,7 +7,7 @@ pub struct UserUploadPayload {
     pub id: ObjectId,
     #[serde(serialize_with = "super::serialize_oid")]
     pub user_id: ObjectId,
-    #[serde(serialize_with = "super::serialize_oid")]
-    pub chat_id: ObjectId,
+    #[serde(serialize_with = "super::serialize_option_oid")]
+    pub chat_id: Option<ObjectId>,
     pub content_type: String,
 }

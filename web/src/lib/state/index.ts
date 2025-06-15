@@ -136,6 +136,9 @@ export async function init() {
                 );
                 localStorage.removeItem(`streaming-message-${chat.id}-search`);
                 localStorage.removeItem(`streaming-message-${chat.id}-model`);
+                localStorage.removeItem(
+                  `streaming-message-${chat.id}-memory`
+                );
                 clearPendingMessage(chat.id);
                 addChatMessages(chat.id, [{ ...message, updated_memory: memory?.content ?? null }]);
               },

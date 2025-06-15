@@ -130,9 +130,10 @@ export const sendAndSubscribe = async (
     },
     (message) => {
       // memory is not sent with "done" chunk
-      const memory = localStorage.getItem(
+      const memoryString = localStorage.getItem(
         `streaming-message-${chatId}-memory`
       );
+      const memory = memoryString ? JSON.parse(memoryString) : null;
 
       localStorage.removeItem(`stream-${chatId}`);
       localStorage.removeItem(`streaming-message-${chatId}`);

@@ -63,8 +63,9 @@ export const sendAndSubscribe = async (
     updatePendingMessageMemory,
     setChatState,
   } = useChatsStore.getState();
-  const { setInferenceError } = useServiceStore.getState();
+  const { setInferenceError, removeInferenceError } = useServiceStore.getState();
   const provider = model.base_url;
+  removeInferenceError("openrouter");
   const { stream_id, user_message } = await createMessage(chatId, payload);
   addMessages(chatId, [user_message]);
   localStorage.setItem(`chat-model-${chatId}`, model.identifier);
@@ -105,7 +106,7 @@ export const sendAndSubscribe = async (
           provider === "https://openrouter.ai/api/v1/chat/completions"
         ) {
           setInferenceError("openrouter", control.control.code);
-          console.log("code", control.control.code);
+          console.error("code", control.control.code);
         }
         localStorage.removeItem(`stream-${chatId}`);
         localStorage.removeItem(`streaming-message-${chatId}`);
@@ -119,12 +120,17 @@ export const sendAndSubscribe = async (
       } else if (is.memoryAdded(control.control)) {
         localStorage.setItem(
           `streaming-message-${chatId}-memory`,
-          control.control.memory,
+          JSON.stringify(control.control.memory),
         );
-        updatePendingMessageMemory(chatId, control.control.memory);
+        updatePendingMessageMemory(chatId, control.control.memory.content);
       }
     },
     (message) => {
+      // memory is not sent with "done" chunk
+      const memory = localStorage.getItem(
+        `streaming-message-${chatId}-memory`
+      );
+
       localStorage.removeItem(`stream-${chatId}`);
       localStorage.removeItem(`streaming-message-${chatId}`);
       localStorage.removeItem(`streaming-message-reasoning-${chatId}`);
@@ -134,7 +140,7 @@ export const sendAndSubscribe = async (
         `streaming-message-${chatId}-memory`
       );
       clearPendingMessage(chatId);
-      addMessages(chatId, [message]);
+      addMessages(chatId, [{ ...message, updated_memory: memory }]);
       setChatState(chatId, { status: "success" });
     },
   );

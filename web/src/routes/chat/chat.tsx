@@ -196,7 +196,7 @@ export function Chat() {
         ref={scrollableContainer}
       >
         {pendingMessage &&
-          (pendingMessage.content.length !== 0 ||
+          (pendingMessage.content && pendingMessage.content.length !== 0 ||
             (pendingMessage.reasoning &&
               pendingMessage.reasoning.length !== 0)) ? (
           <Message

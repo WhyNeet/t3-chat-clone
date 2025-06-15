@@ -5,7 +5,6 @@ import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { ChevronDownIcon, Database, FileText } from "lucide-react";
 import { getFileUri } from "../lib/api/files";
-import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import { Popover, PopoverContent } from "./ui/popover";
 import { PopoverTrigger } from "@radix-ui/react-popover";
 
@@ -28,12 +27,12 @@ export const Message = forwardRef<
     >
       {message.updated_memory ? <Popover>
         <PopoverTrigger asChild>
-          <div className="mb-4 font-display text-pink-300 brightness-75 flex items-center gap-2 text-sm font-medium w-fit">
+          <div className="mb-4 font-display text-pink-300 brightness-75 flex items-center gap-2 text-sm font-medium w-fit cursor-pointer">
             <Database className="h-6 w-6" />
             Memory Updated
           </div>
         </PopoverTrigger>
-        <PopoverContent className="bg-pink-50 border-pink-900/20 text-sm font-medium font-display px-2 py-2 w-fit text-pink-900">
+        <PopoverContent className="bg-pink-50 border-pink-900/20 text-sm font-medium font-display px-3 py-2 w-fit text-pink-900">
           {message.updated_memory}
         </PopoverContent>
       </Popover> : null}

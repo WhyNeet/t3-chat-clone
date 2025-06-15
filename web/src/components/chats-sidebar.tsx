@@ -97,7 +97,7 @@ export function ChatsSidebar() {
                 onOpenChange={setRenameDialogOpen}
               >
                 <DialogContent>
-                  <DialogTitle className="font-medium font-display text-lg">
+                  <DialogTitle className="font-medium font-display text-xl">
                     Rename Chat
                   </DialogTitle>
                   <Input placeholder="My Awesome Chat" value={currentRename} onBlur={() => setCurrentRename(prev => prev.trim())} onChange={e => setCurrentRename(e.currentTarget.value)} />

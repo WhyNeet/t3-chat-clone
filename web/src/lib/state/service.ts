@@ -11,9 +11,10 @@ export interface ServiceStore {
   inferenceError: Record<string, number>; // Provier name -> error
   setModels: (models: { free: Model[], paid: Model[] }) => void;
   setInferenceError: (provider: string, code: number) => void;
+  removeInferenceError: (provider: string) => void;
 }
 
-export const useServiceStore = create<ServiceStore>((set) => ({
+export const useServiceStore = create<ServiceStore>((set, get) => ({
   models: null,
   keys: null,
   inferenceError: {},
@@ -29,4 +30,9 @@ export const useServiceStore = create<ServiceStore>((set) => ({
     set((state) => ({
       inferenceError: { ...state.inferenceError, [provider]: error },
     })),
+  removeInferenceError: provider => {
+    const errors = get().inferenceError;
+    delete errors[provider];
+    set({ inferenceError: { ...errors } });
+  }
 }));

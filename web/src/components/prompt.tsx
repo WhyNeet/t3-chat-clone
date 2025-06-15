@@ -200,7 +200,7 @@ export function Prompt() {
                 <Button
                   intent="ghost"
                   size="small"
-                  className="gap-1 text-pink-900"
+                  className="gap-1 rounded-full bg-pink-800/10 text-pink-900 pl-2.5 border border-transparent hover:bg-pink-900/20"
                 >
                   {selectedModel.name}
                   <ChevronDownIcon className="h-4 w-4" />

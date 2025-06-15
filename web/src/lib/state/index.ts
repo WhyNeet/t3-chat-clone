@@ -3,9 +3,11 @@ import { chats } from "../api/chats";
 import { is, subscribeToStream } from "../api/completions";
 import { listUnsentFiles } from "../api/files";
 import { listKeys } from "../api/keys";
-import { listModels } from "../api/service";
+import { listMemories, listModels } from "../api/service";
+import type { Memory } from "../model/memory";
 import { useAuthStore } from "./auth";
 import { useChatsStore } from "./chats";
+import { useMemoryStore } from "./memory";
 import { useServiceStore } from "./service";
 
 export async function init() {
@@ -18,6 +20,11 @@ export async function init() {
   const models = await listModels();
   setModels(models);
   const { updateUser } = useAuthStore.getState();
+
+  const { setMemories, addMemory } = useMemoryStore.getState();
+  listMemories().then(memories => {
+    setMemories(memories);
+  });
 
   const { setInferenceError } = useServiceStore.getState();
   const {
@@ -60,11 +67,12 @@ export async function init() {
             const model = localStorage.getItem(
               `streaming-message-${chat.id}-model`,
             );
-            const memory = localStorage.getItem(`streaming-message-${chat.id}-memory`) ?? null;
+            const memoryString = localStorage.getItem(`streaming-message-${chat.id}-memory`);
+            const memory: Memory | null = memoryString ? JSON.parse(memoryString) : null;
             const provider_data = models.free.find(m => m.name === model) ?? models.paid.find(m => m.name === model)!;
             const provider = provider_data.base_url;
-            initPendingMessage(chat.id, model ?? "AI", isSearching, memory);
-            updatePendingMessage(chat.id, { content: message, reasoning, memory });
+            initPendingMessage(chat.id, model ?? "AI", isSearching, memory?.content ?? null);
+            updatePendingMessage(chat.id, { content: message, reasoning, memory: memory?.content ?? null });
             subscribeToStream(
               streamId,
               (delta) => {
@@ -108,12 +116,19 @@ export async function init() {
                 } else if (is.memoryAdded(control.control)) {
                   localStorage.setItem(
                     `streaming-message-${chat.id}-memory`,
-                    control.control.memory,
+                    JSON.stringify(control.control.memory),
                   );
-                  updatePendingMessageMemory(chat.id, control.control.memory);
+                  updatePendingMessageMemory(chat.id, control.control.memory.id);
+                  addMemory(control.control.memory);
                 }
               },
               (message) => {
+                // memory is not sent with "done" chunk
+                const memoryString = localStorage.getItem(
+                  `streaming-message-${chat.id}-memory`
+                );
+                const memory: Memory | null = memoryString ? JSON.parse(memoryString) : null;
+
                 localStorage.removeItem(`stream-${chat.id}`);
                 localStorage.removeItem(`streaming-message-${chat.id}`);
                 localStorage.removeItem(
@@ -122,7 +137,7 @@ export async function init() {
                 localStorage.removeItem(`streaming-message-${chat.id}-search`);
                 localStorage.removeItem(`streaming-message-${chat.id}-model`);
                 clearPendingMessage(chat.id);
-                addChatMessages(chat.id, [message]);
+                addChatMessages(chat.id, [{ ...message, updated_memory: memory?.content ?? null }]);
               },
             );
           }

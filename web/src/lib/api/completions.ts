@@ -1,4 +1,5 @@
 import { BACKEND_URI } from "../constants";
+import type { Memory } from "../model/memory";
 import type { ChatMessage } from "../model/message";
 
 export function subscribeToStream(
@@ -65,7 +66,7 @@ export interface ControlChatNameUpdated {
 
 export interface ControlMemoryAdded {
   kind: ControlKind.MemoryAdded;
-  memory: string;
+  memory: Memory;
 }
 
 export interface ControlInferenceError {

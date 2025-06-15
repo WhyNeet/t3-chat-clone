@@ -2,10 +2,14 @@ import { useEffect, useRef } from "react";
 import { Button } from "../components/ui/button";
 import { ChatsSidebar, useSidebarStore } from "../components/chats-sidebar";
 import { ChevronRight } from "lucide-react";
-import { Outlet } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { cn } from "../components/utils";
+import { Memories } from "../components/memories";
+import { Logo } from "../components/logo";
 
 export function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { isOpen: sidebarOpen, toggle, setIsOpen: setSidebarOpen } = useSidebarStore();
   const viewRef = useRef<HTMLDivElement>(null);
 
@@ -34,18 +38,32 @@ export function App() {
         ref={viewRef}
         className={`h-full bg-white transition-none duration-200 overflow-hidden ${sidebarOpen ? "md:rounded-tl-3xl w-screen md:w-[calc(100vw-288px)]" : "w-full"} relative`}
       >
-        <div className="fixed top-3 left-3 z-50">
+        <div className="fixed top-3 left-3 z-50 flex gap-2">
           <Button
             onClick={toggle}
             intent="ghost"
             size="square"
             rounded="circle"
-            className={cn(sidebarOpen ? "hover:bg-pink-50" : "bg-pink-300/20 hover:bg-pink-400/20 backdrop-blur-2xl")}
+            className={cn("transition duration-200", sidebarOpen ? "hover:bg-pink-50" : "bg-pink-300/20 hover:bg-pink-400/20 backdrop-blur-2xl")}
           >
             <ChevronRight
-              className={`h-5 w-5 transition duration-200 ${sidebarOpen ? "rotate-180" : "rotate-0"}`}
+              className={`h-5 w-5 text-pink-900 transition duration-200 ${sidebarOpen ? "rotate-180" : "rotate-0"}`}
             />
           </Button>
+          <Button
+            onClick={() => navigate("/")}
+            intent="ghost"
+            size="square"
+            rounded="circle"
+            className={cn("bg-pink-300/20 hover:bg-pink-400/20 backdrop-blur-2xl transition duration-200", sidebarOpen || location.pathname === "/" ? "opacity-0 scale-50 pointer-events-none" : "opacity-100 scale-100")}
+          >
+            <Logo
+              className="h-5 w-5 text-pink-900 transition duration-200"
+            />
+          </Button>
+        </div>
+        <div className="fixed top-3 right-3 z-50">
+          <Memories />
         </div>
         <Outlet />
       </div>

@@ -12,7 +12,8 @@ use uuid::Uuid;
 
 use crate::{
     payload::chat::{ChatMessageContentPayload, ChatMessagePayload},
-    state::{ApiDelta, AppState, ControlChunk},
+    state::AppState,
+    streaming::{ApiDelta, ControlChunk},
 };
 
 pub async fn handler(

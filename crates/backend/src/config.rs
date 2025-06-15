@@ -141,7 +141,7 @@ impl ModelsConfig {
                 },
                 Model {
                     identifier: "google/gemini-2.5-flash-preview-05-20:thinking".to_string(),
-                    name: "Gemini 2.5 Flash Preview 05-20 (thinking)".to_string(),
+                    name: "Gemini 2.5 Flash Preview (thinking)".to_string(),
                     api_kind: ModelApiKind::OpenAI,
                     base_url: "https://openrouter.ai/api/v1/chat/completions".to_string(),
                     is_reasoning: true,
@@ -169,7 +169,7 @@ impl ModelsConfig {
                     api_kind: ModelApiKind::OpenAI,
                     base_url: "https://openrouter.ai/api/v1/chat/completions".to_string(),
                     is_reasoning: true,
-                    author: "Perplexity".to_string(),
+                    author: "OpenAI".to_string(),
                 },
             ],
         }

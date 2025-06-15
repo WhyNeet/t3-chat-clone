@@ -21,6 +21,7 @@ use futures::{AsyncReadExt, StreamExt, TryStreamExt, future::join_all};
 use hmac::digest::generic_array::GenericArray;
 use model::{
     key::UserApiKey,
+    memory::Memory,
     message::{ChatMessage, ChatMessageContent, Role},
     upload::UserUpload,
 };
@@ -33,7 +34,8 @@ use uuid::Uuid;
 use crate::{
     middleware::auth::Auth,
     payload::chat::{ChatMessageContentPayload, ChatMessagePayload},
-    state::{ApiDelta, AppState, ControlChunk},
+    state::AppState,
+    streaming::{ApiDelta, ControlChunk},
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -242,6 +244,7 @@ pub async fn handler(
         reasoning: None,
         role: Role::User,
         chat_id: chat.id.unwrap(),
+        updated_memory: None,
         timestamp: Utc::now(),
     };
 
@@ -418,11 +421,13 @@ pub async fn handler(
             model: Some(model.name.clone()),
             role: Role::Assistant,
             reasoning: None,
+            updated_memory: None,
             chat_id: chat.id.unwrap(),
             timestamp: Utc::now(),
         };
         let task2_state = Arc::clone(&task_state);
         let task_message = assistant_message.clone();
+        let task_tx = tx.clone();
         tokio::spawn(async move {
             task2_state
                 .database()
@@ -430,6 +435,64 @@ pub async fn handler(
                 .create(task_message)
                 .await
                 .unwrap();
+
+            tokio::spawn(async move {
+                let memories = task2_state
+                    .database()
+                    .memories
+                    .get_many(doc! { "user_id": user_id })
+                    .await
+                    .unwrap()
+                    .map_ok(|memory| memory.content)
+                    .try_collect::<Vec<String>>()
+                    .await
+                    .unwrap();
+
+                let prompt = format!("You are an AI Memory Assistant. Your task is to:
+1. Analyze the current user message.
+2. If there is an existing memory in [Existing memories] that directly pertains to the message, output it.
+3. If no relevant memory exists, but the message contains important information (e.g., goals, preferences, or facts), generate a new concise memory statement.
+4. Otherwise, output \"NONE\".
+
+Memory format (do not include braces): [Concise memory statement].
+For example: Input - \"Hey there! I am building an AI chat.\", Output - \"User is building an AI chat.\"
+
+Existing memories: {};
+
+Current user message:
+            {}", payload.message.trim(), serde_json::to_string(&memories).unwrap());
+
+                let memory = OpenAIClient::new(
+                    env::var("CHUTES_KEY").unwrap(),
+                    "https://llm.chutes.ai/v1/completions".to_string(),
+                )
+                .prompt_completion_non_streaming(
+                    "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
+                    prompt,
+                    Some(0.3),
+                    Some(1000),
+                )
+                .await
+                .unwrap();
+
+                if memory == "NONE" {
+                    return;
+                }
+
+                task2_state
+                    .database()
+                    .memories
+                    .create(Memory {
+                        id: None,
+                        content: memory.clone(),
+                    })
+                    .await
+                    .unwrap();
+
+                let _ = task_tx
+                    .send_async(ApiDelta::Control(ControlChunk::MemoryAdded { memory }))
+                    .await;
+            });
         });
 
         let stream = client

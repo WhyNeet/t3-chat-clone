@@ -1,11 +1,13 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use axum::{
     Json,
     extract::{Path, State},
     response::IntoResponse,
 };
-use mongodb::bson::oid::ObjectId;
+use futures::TryStreamExt;
+use model::upload::UserUpload;
+use mongodb::bson::{Bson, doc, oid::ObjectId};
 use reqwest::StatusCode;
 use serde_json::json;
 
@@ -44,6 +46,28 @@ pub async fn handler(
     {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+
+    tokio::spawn(async move {
+        // delete associated files
+        let files = state
+            .database()
+            .uploads
+            .get_many(doc! { "chat_id": chat_id, "user_id": ObjectId::from_str(&session.user_id).unwrap() })
+            .await
+            .unwrap()
+            .try_collect::<Vec<UserUpload>>()
+            .await
+            .unwrap();
+
+        for file in files {
+            state.database().uploads.delete(file.id).await.unwrap();
+            state
+                .bucket()
+                .delete(Bson::ObjectId(file.id))
+                .await
+                .unwrap();
+        }
+    });
 
     StatusCode::OK.into_response()
 }

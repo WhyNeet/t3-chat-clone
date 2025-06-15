@@ -6,3 +6,4 @@ pub mod payload;
 pub mod routes;
 pub mod search;
 pub mod state;
+pub mod streaming;

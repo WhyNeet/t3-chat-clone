@@ -4,18 +4,19 @@ use std::{
     time::Duration,
 };
 
-use crate::{config::ModelsConfig, data::mongodb::MongoDataAdapter, search::WebSearch};
-use ai::openai::{completions::OpenAICompletionDelta, streaming::OpenAIClient};
-use model::{chat::Chat, key::ApiKey, message::ChatMessage, upload::UserUpload, user::User};
+use crate::{
+    config::ModelsConfig, search::WebSearch, state::database::Database, streaming::ApiDelta,
+};
+use ai::openai::streaming::OpenAIClient;
 use mongodb::{
-    Client, IndexModel,
-    bson::doc,
+    Client,
     gridfs::GridFsBucket,
-    options::{GridFsBucketOptions, IndexOptions, WriteConcern},
+    options::{GridFsBucketOptions, WriteConcern},
 };
 use redis_om::redis::aio::MultiplexedConnection;
-use serde::Serialize;
 use uuid::Uuid;
+
+pub mod database;
 
 pub struct AppState {
     openrouter: OpenAIClient,
@@ -38,39 +39,6 @@ impl AppState {
         hmac_key: Box<[u8]>,
         search: WebSearch,
     ) -> anyhow::Result<Self> {
-        client.database("chat").create_collection("users").await?;
-        client
-            .database("chat")
-            .collection::<User>("users")
-            .create_index(
-                IndexModel::builder()
-                    .keys(doc! { "email": -1 })
-                    .options(IndexOptions::builder().unique(true).build())
-                    .build(),
-            )
-            .await?;
-        client.database("chat").create_collection("chats").await?;
-        client
-            .database("chat")
-            .create_collection("messages")
-            .await?;
-        client
-            .database("chat")
-            .collection::<User>("messages")
-            .create_index(IndexModel::builder().keys(doc! { "chat_id": 1 }).build())
-            .await?;
-
-        client
-            .database("chat")
-            .collection::<ApiKey>("keys")
-            .create_index(IndexModel::builder().keys(doc! { "user_id": 1 }).build())
-            .await?;
-        client
-            .database("chat")
-            .collection::<ApiKey>("uploads")
-            .create_index(IndexModel::builder().keys(doc! { "chat_id": 1 }).build())
-            .await?;
-
         let gridfs_opts = GridFsBucketOptions::builder()
             .bucket_name("attachments".to_string())
             .write_concern(
@@ -86,25 +54,7 @@ impl AppState {
         Ok(Self {
             openrouter,
             streams: Default::default(),
-            database: Database {
-                users: MongoDataAdapter::new(
-                    client.clone(),
-                    "chat".to_string(),
-                    "users".to_string(),
-                ),
-                chats: MongoDataAdapter::new(
-                    client.clone(),
-                    "chat".to_string(),
-                    "chats".to_string(),
-                ),
-                messages: MongoDataAdapter::new(
-                    client.clone(),
-                    "chat".to_string(),
-                    "messages".to_string(),
-                ),
-                keys: MongoDataAdapter::new(client.clone(), "chat".to_string(), "keys".to_string()),
-                uploads: MongoDataAdapter::new(client, "chat".to_string(), "uploads".to_string()),
-            },
+            database: Database::new(client).await?,
             bucket,
             redis: conn,
             aes_key,
@@ -157,26 +107,4 @@ impl AppState {
     pub fn bucket(&self) -> &GridFsBucket {
         &self.bucket
     }
-}
-
-pub enum ApiDelta {
-    Chunk(OpenAICompletionDelta),
-    Control(ControlChunk),
-}
-
-#[derive(Debug, Serialize)]
-#[serde(tag = "kind")]
-pub enum ControlChunk {
-    Done { message: ChatMessage },
-    WebSearchPerformed,
-    ChatNameUpdated { name: String },
-    InferenceError { code: u16 },
-}
-
-pub struct Database {
-    pub users: MongoDataAdapter<User>,
-    pub chats: MongoDataAdapter<Chat>,
-    pub messages: MongoDataAdapter<ChatMessage>,
-    pub keys: MongoDataAdapter<ApiKey>,
-    pub uploads: MongoDataAdapter<UserUpload>,
 }

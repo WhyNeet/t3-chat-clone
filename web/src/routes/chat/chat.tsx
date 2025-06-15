@@ -207,6 +207,7 @@ export function Chat() {
               reasoning: pendingMessage.reasoning,
               id: "pending-message",
               role: Role.Assistant,
+              updated_memory: pendingMessage.memory,
               timestamp: "",
             }}
           />

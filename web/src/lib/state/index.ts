@@ -29,6 +29,7 @@ export async function init() {
     initPendingMessage,
     finishWebSearch,
     updateChatName,
+    updatePendingMessageMemory,
     setUploads
   } = useChatsStore.getState();
   listUnsentFiles(null).then(uploads => {
@@ -59,16 +60,18 @@ export async function init() {
             const model = localStorage.getItem(
               `streaming-message-${chat.id}-model`,
             );
+            const memory = localStorage.getItem(`streaming-message-${chat.id}-memory`) ?? null;
             const provider_data = models.free.find(m => m.name === model) ?? models.paid.find(m => m.name === model)!;
             const provider = provider_data.base_url;
-            initPendingMessage(chat.id, model ?? "AI", isSearching);
-            updatePendingMessage(chat.id, { content: message, reasoning });
+            initPendingMessage(chat.id, model ?? "AI", isSearching, memory);
+            updatePendingMessage(chat.id, { content: message, reasoning, memory });
             subscribeToStream(
               streamId,
               (delta) => {
                 updatePendingMessage(chat.id, {
                   reasoning: delta.reasoning,
                   content: delta.reasoning ? null : delta.content,
+                  memory: null
                 });
                 localStorage.setItem(
                   `streaming-message-${chat.id}`,
@@ -102,6 +105,12 @@ export async function init() {
                   localStorage.removeItem(`streaming-message-${chat.id}-search`);
                   localStorage.removeItem(`streaming-message-${chat.id}-model`);
                   clearPendingMessage(chat.id);
+                } else if (is.memoryAdded(control.control)) {
+                  localStorage.setItem(
+                    `streaming-message-${chat.id}-memory`,
+                    control.control.memory,
+                  );
+                  updatePendingMessageMemory(chat.id, control.control.memory);
                 }
               },
               (message) => {

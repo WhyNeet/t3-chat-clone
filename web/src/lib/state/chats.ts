@@ -27,6 +27,7 @@ export interface ChatStore {
       reasoning: string | null;
       model: string;
       search: boolean;
+      memory: string | null;
     } | null
   >; // id -> pending message string
   uploads: Record<string, UserUpload[]>;
@@ -42,14 +43,15 @@ export interface ChatStore {
   addChatMessages: (id: string, messages: ChatMessage[]) => void;
   prependChatMessages: (id: string, messages: ChatMessage[]) => void;
   updateChatName: (id: string, name: string) => void;
-  initPendingMessage: (id: string, model: string, search: boolean) => void;
+  initPendingMessage: (id: string, model: string, search: boolean, memory: string | null) => void;
   updatePendingMessage: (
     id: string,
-    delta: { content: string | null; reasoning: string | null },
+    delta: { content: string | null; reasoning: string | null, memory: string | null },
   ) => void;
   setChatMessages: (id: string, messages: ChatMessage[]) => void;
   setChatState: (id: string, state: ChatState) => void;
   clearPendingMessage: (id: string) => void;
+  updatePendingMessageMemory: (id: string, memory: string) => void;
   initializeChat: (chat: Chat, messages?: ChatMessage[]) => void;
 }
 
@@ -166,7 +168,7 @@ export const useChatsStore = create<ChatStore>((set, get) => ({
       };
     });
   },
-  initPendingMessage: (id, model, search) => {
+  initPendingMessage: (id, model, search, memory) => {
     set((state) => ({
       pendingMessages: {
         ...state.pendingMessages,
@@ -175,6 +177,7 @@ export const useChatsStore = create<ChatStore>((set, get) => ({
           content: "",
           reasoning: null,
           search,
+          memory
         },
       },
       chats: {
@@ -200,10 +203,14 @@ export const useChatsStore = create<ChatStore>((set, get) => ({
             ...state.pendingMessages[id]!,
             content: state.pendingMessages[id]!.content + (delta.content ?? ""),
             reasoning,
+            memory: state.pendingMessages[id]!.memory ?? delta.memory
           },
         },
       };
     });
+  },
+  updatePendingMessageMemory: (id, memory) => {
+    set(state => ({ pendingMessages: { ...state.pendingMessages, [id]: { ...state.pendingMessages[id]!, memory } } }))
   },
   clearPendingMessage: (id: string) => {
     set((state) => ({

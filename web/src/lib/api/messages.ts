@@ -60,6 +60,7 @@ export const sendAndSubscribe = async (
     finishWebSearch,
     updateChatName,
     clearPendingMessage,
+    updatePendingMessageMemory,
     setChatState,
   } = useChatsStore.getState();
   const { setInferenceError } = useServiceStore.getState();
@@ -71,13 +72,14 @@ export const sendAndSubscribe = async (
   if (payload.use_search)
     localStorage.setItem(`streaming-message-${chatId}-search`, "");
   onRequestFinished();
-  initPendingMessage(chatId, model.name, payload.use_search);
+  initPendingMessage(chatId, model.name, payload.use_search, null);
   subscribeToStream(
     stream_id,
     (delta) => {
       updatePendingMessage(chatId, {
         content: delta.content,
         reasoning: delta.reasoning,
+        memory: null
       });
       localStorage.setItem(
         `streaming-message-${chatId}`,
@@ -110,7 +112,16 @@ export const sendAndSubscribe = async (
         localStorage.removeItem(`streaming-message-reasoning-${chatId}`);
         localStorage.removeItem(`streaming-message-${chatId}-search`);
         localStorage.removeItem(`streaming-message-${chatId}-model`);
+        localStorage.removeItem(
+          `streaming-message-${chatId}-memory`
+        );
         clearPendingMessage(chatId);
+      } else if (is.memoryAdded(control.control)) {
+        localStorage.setItem(
+          `streaming-message-${chatId}-memory`,
+          control.control.memory,
+        );
+        updatePendingMessageMemory(chatId, control.control.memory);
       }
     },
     (message) => {
@@ -119,6 +130,9 @@ export const sendAndSubscribe = async (
       localStorage.removeItem(`streaming-message-reasoning-${chatId}`);
       localStorage.removeItem(`streaming-message-${chatId}-search`);
       localStorage.removeItem(`streaming-message-${chatId}-model`);
+      localStorage.removeItem(
+        `streaming-message-${chatId}-memory`
+      );
       clearPendingMessage(chatId);
       addMessages(chatId, [message]);
       setChatState(chatId, { status: "success" });

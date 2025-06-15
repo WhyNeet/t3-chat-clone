@@ -3,8 +3,11 @@ import { Role, type ChatMessage } from "../lib/model/message";
 import { cn } from "./utils";
 import Markdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { ChevronDownIcon, FileText } from "lucide-react";
+import { ChevronDownIcon, Database, FileText } from "lucide-react";
 import { getFileUri } from "../lib/api/files";
+import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
+import { Popover, PopoverContent } from "./ui/popover";
+import { PopoverTrigger } from "@radix-ui/react-popover";
 
 export const Message = forwardRef<
   HTMLDivElement,
@@ -18,11 +21,22 @@ export const Message = forwardRef<
         `mb-2 p-4 border border-transparent relative hover:border-pink-950/20 rounded-lg ${message.role === Role.User ? "self-end" : ""}`,
         message.role === Role.User ? "bg-pink-50" : "",
         className,
+        message.model ? "mb-6" : ""
       )}
       {...props}
       ref={ref}
     >
-
+      {message.updated_memory ? <Popover>
+        <PopoverTrigger asChild>
+          <div className="mb-4 font-display text-pink-300 brightness-75 flex items-center gap-2 text-sm font-medium w-fit">
+            <Database className="h-6 w-6" />
+            Memory Updated
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="bg-pink-50 border-pink-900/20 text-sm font-medium font-display px-2 py-2 w-fit text-pink-900">
+          {message.updated_memory}
+        </PopoverContent>
+      </Popover> : null}
       {message.content.length > 1 ? <div className="flex gap-2 mb-2">
         {message.content.slice(1).map(content => {
           switch (content.type) {

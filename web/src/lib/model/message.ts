@@ -5,6 +5,7 @@ export interface ChatMessage {
   reasoning: string | null;
   role: Role;
   chat_id: string;
+  updated_memory: string | null;
   timestamp: string;
 }
 

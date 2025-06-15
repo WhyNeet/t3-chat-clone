@@ -57,6 +57,7 @@ export function ChatsSidebar() {
   const handleDeleteChat = async (id: string) => {
     await deleteChat(id);
     deleteChatState(id);
+    localStorage.removeItem(`chat-model-${id}`);
     navigate("/");
   };
 

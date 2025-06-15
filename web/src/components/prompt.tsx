@@ -25,6 +25,7 @@ import type { Model } from "../lib/model/service";
 import { useAuthStore } from "../lib/state/auth";
 import { toast } from "sonner";
 import { deleteFile, getFileUri, uploadFile } from "../lib/api/files";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 export function Prompt() {
   const navigate = useNavigate();
@@ -212,21 +213,40 @@ export function Prompt() {
                     {models.free.map((model) => (
                       <button
                         onClick={() => handleModelSelectorClick(model)}
-                        className="py-3 px-4 h-11 hover:bg-pink-900/10 rounded-md transition text-left cursor-pointer text-sm font-display font-medium whitespace-nowrap"
+                        className="py-3 px-4 hover:bg-pink-900/10 rounded-md transition text-left cursor-pointer whitespace-nowrap"
                         key={model.identifier}
                       >
-                        {model.name}
+                        <p className="text-xs font-display font-medium text-pink-900/60">
+                          {model.author}
+                        </p>
+                        <div className="text-sm font-display font-medium">
+                          {model.name}
+                        </div>
                       </button>
                     ))}
                     {models.paid.map((model) => (
                       <button
                         onClick={() => handleModelSelectorClick(model)}
                         disabled={keys !== null && keys.length === 0}
-                        className="py-3 px-4 h-11 pr-2 hover:bg-pink-900/10 rounded-md transition flex items-center justify-between cursor-pointer text-sm font-display font-medium disabled:opacity-60 whitespace-nowrap"
+                        className="py-3 px-4 pr-2 hover:bg-pink-900/10 rounded-md transition cursor-pointer disabled:opacity-60 whitespace-nowrap text-left"
                         key={model.identifier}
                       >
-                        <div className="max-w-[80%] overflow-hidden overflow-ellipsis">{model.name}</div>
-                        <div className="w-7 h-7 flex items-center justify-center rounded-md bg-pink-900/20"><Key className="h-4 w-4 text-pink-900/60" /></div>
+                        <div className="text-xs font-display font-medium text-pink-900/60 flex items-center gap-1 h-4">
+                          {model.author}
+
+                          <div className="h-0.5 w-0.5 rounded-full bg-pink-900/60"></div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Key className="h-3 w-3 stroke-3 text-pink-900/60" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Bring Your Own Key
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <div className="text-sm font-display font-medium flex items-center gap-2">
+                          {model.name}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -259,18 +279,25 @@ export function Prompt() {
               <Globe className="h-4 w-4" />
               Web Search
             </Button>
-            <Button
-              onClick={() => handleUploadClick()}
-              intent="ghost"
-              size="square"
-              disabled={isUploading}
-              rounded="circle"
-              className={cn(
-                "gap-1.5 border-pink-900/20 border text-pink-900 transition h-[30px] w-[30px] disabled:opacity-80 disabled:hover:bg-transparent disabled:cursor-not-allowed",
-              )}
-            >
-              {isUploading ? <Loader className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={() => handleUploadClick()}
+                  intent="ghost"
+                  size="square"
+                  disabled={isUploading}
+                  rounded="circle"
+                  className={cn(
+                    "gap-1.5 border-pink-900/20 border text-pink-900 transition h-[30px] w-[30px] disabled:opacity-80 disabled:hover:bg-transparent disabled:cursor-not-allowed",
+                  )}
+                >
+                  {isUploading ? <Loader className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Supports PNG, JPEG and PDF up to 1MB
+              </TooltipContent>
+            </Tooltip>
           </>
         ) : null}
       </div>

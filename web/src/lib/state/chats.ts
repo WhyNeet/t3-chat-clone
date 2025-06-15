@@ -51,7 +51,7 @@ export interface ChatStore {
   setChatMessages: (id: string, messages: ChatMessage[]) => void;
   setChatState: (id: string, state: ChatState) => void;
   clearPendingMessage: (id: string) => void;
-  updatePendingMessageMemory: (id: string, memory: Memory) => void;
+  updatePendingMessageMemory: (id: string, memory: string) => void;
   initializeChat: (chat: Chat, messages?: ChatMessage[]) => void;
 }
 

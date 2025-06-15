@@ -3,6 +3,7 @@ use serde::Serializer;
 
 pub mod auth;
 pub mod chat;
+pub mod memories;
 pub mod upload;
 
 pub fn serialize_oid<S>(oid: &ObjectId, serializer: S) -> Result<S::Ok, S::Error>

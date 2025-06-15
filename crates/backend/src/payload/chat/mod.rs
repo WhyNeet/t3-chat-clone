@@ -21,6 +21,7 @@ pub struct ChatMessagePayload {
     pub model: Option<String>,
     pub reasoning: Option<String>,
     pub role: Role,
+    pub updated_memory: Option<String>,
     #[serde(serialize_with = "super::serialize_oid")]
     pub chat_id: ObjectId,
     pub timestamp: chrono::DateTime<Utc>,

@@ -81,6 +81,7 @@ pub async fn handler(
                 model: msg.model,
                 timestamp: chat.timestamp,
                 reasoning: msg.reasoning,
+                updated_memory: msg.updated_memory,
                 chat_id: msg.chat_id,
                 role: msg.role,
             })

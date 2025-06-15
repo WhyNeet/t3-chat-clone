@@ -448,19 +448,16 @@ pub async fn handler(
                     .await
                     .unwrap();
 
-                let prompt = format!("You are an AI Memory Assistant. Your task is to:
-1. Analyze the current user message.
-2. If there is an existing memory in [Existing memories] that directly pertains to the message, output it.
-3. If no relevant memory exists, but the message contains important information (e.g., goals, preferences, or facts), generate a new concise memory statement.
-4. Otherwise, output \"NONE\".
-
-Memory format (do not include braces): [Concise memory statement].
-For example: Input - \"Hey there! I am building an AI chat.\", Output - \"User is building an AI chat.\"
-
-Existing memories: {};
-
-Current user message:
-            {}", payload.message.trim(), serde_json::to_string(&memories).unwrap());
+                let prompt = format!("Here are some examples of user messages and their extracted concise memory statements:
+    input: Hey there! I am building an AI chat.
+    output: User is building an AI chat.
+    input: I prefer dark mode and hate popups.
+    output: User prefers dark mode and hates popups.
+    Task:
+    If the following message contains important information (e.g., goals, preferences, or facts), generate a new concise memory statement. If there are multiple memories, output the most important one. Otherwise, output \"NONE\". If the memory already exists, also output \"NONE\".
+    Memories: {};
+    Message: \"{}\"
+    Output:", if memories.is_empty() { "No memories yet".to_string() } else { serde_json::to_string(&memories).unwrap() }, payload.message.trim());
 
                 let memory = OpenAIClient::new(
                     env::var("CHUTES_KEY").unwrap(),
@@ -484,8 +481,18 @@ Current user message:
                     .memories
                     .create(Memory {
                         id: None,
+                        user_id,
                         content: memory.clone(),
                     })
+                    .await
+                    .unwrap();
+                task2_state
+                    .database()
+                    .messages
+                    .update(
+                        assistant_message_id,
+                        doc! { "$set": { "updated_memory": memory.clone() } },
+                    )
                     .await
                     .unwrap();
 
@@ -625,6 +632,7 @@ Current user message:
             content,
             model: None,
             reasoning: None,
+            updated_memory: None,
             role: user_message.role,
             timestamp: user_message.timestamp
           }

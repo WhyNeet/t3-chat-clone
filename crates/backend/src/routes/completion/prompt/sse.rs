@@ -47,6 +47,7 @@ pub async fn handler(
                       model: message.model,
                       reasoning: message.reasoning,
                       role: message.role,
+                      updated_memory: message.updated_memory,
                       timestamp: message.timestamp
                 } } }),
                 )

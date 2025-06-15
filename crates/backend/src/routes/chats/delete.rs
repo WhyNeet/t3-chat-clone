@@ -6,7 +6,6 @@ use axum::{
     response::IntoResponse,
 };
 use futures::TryStreamExt;
-use model::upload::UserUpload;
 use mongodb::bson::{Bson, doc, oid::ObjectId};
 use reqwest::StatusCode;
 use serde_json::json;
@@ -48,18 +47,35 @@ pub async fn handler(
     }
 
     tokio::spawn(async move {
-        // delete associated files
-        let files = state
+        let user_id = ObjectId::from_str(&session.user_id).unwrap();
+        // delete messages
+        let mut messages = state
             .database()
-            .uploads
-            .get_many(doc! { "chat_id": chat_id, "user_id": ObjectId::from_str(&session.user_id).unwrap() })
+            .messages
+            .get_many(doc! { "chat_id": chat_id })
             .await
             .unwrap()
-            .try_collect::<Vec<UserUpload>>()
-            .await
-            .unwrap();
+            .into_stream();
 
-        for file in files {
+        while let Ok(Some(message)) = messages.try_next().await {
+            state
+                .database()
+                .messages
+                .delete(message.id.unwrap())
+                .await
+                .unwrap();
+        }
+
+        // delete associated files
+        let mut files = state
+            .database()
+            .uploads
+            .get_many(doc! { "chat_id": chat_id, "user_id": user_id })
+            .await
+            .unwrap()
+            .into_stream();
+
+        while let Ok(Some(file)) = files.try_next().await {
             state.database().uploads.delete(file.id).await.unwrap();
             state
                 .bucket()

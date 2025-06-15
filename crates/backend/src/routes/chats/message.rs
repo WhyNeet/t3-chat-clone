@@ -33,7 +33,10 @@ use uuid::Uuid;
 
 use crate::{
     middleware::auth::Auth,
-    payload::chat::{ChatMessageContentPayload, ChatMessagePayload},
+    payload::{
+        chat::{ChatMessageContentPayload, ChatMessagePayload},
+        memories::MemoryPayload,
+    },
     state::AppState,
     streaming::{ApiDelta, ControlChunk},
 };
@@ -226,6 +229,17 @@ pub async fn handler(
 
     let (tx, rx) = flume::unbounded();
 
+    let memories = state
+        .database()
+        .memories
+        .get_many(doc! { "user_id": user_id })
+        .await
+        .unwrap()
+        .map_ok(|memory| memory.content)
+        .try_collect::<Vec<String>>()
+        .await
+        .unwrap();
+
     let mut user_message_full_content = vec![ChatMessageContent::Text {
         value: payload.message.clone(),
     }];
@@ -316,6 +330,24 @@ pub async fn handler(
             .await
             .unwrap();
 
+        let mut user_message_content = user_message.content.clone();
+        let user_message_text = format!(
+            "If necessary, you may use the following memories about the user to answer: {};\n{}",
+            if memories.is_empty() {
+                "No memories yet.".to_string()
+            } else {
+                serde_json::to_string(&memories).unwrap()
+            },
+            match &user_message_content[0] {
+                ChatMessageContent::Text { value } => value,
+                _ => unreachable!(),
+            }
+        );
+
+        user_message_content[0] = ChatMessageContent::Text {
+            value: user_message_text,
+        };
+
         let message_for_assistant = if let Some(results) = search_results {
             let context: String = results
                 .organic
@@ -329,7 +361,7 @@ pub async fn handler(
                 })
                 .collect();
 
-            let mut user_message_content = user_message.content.clone();
+            let mut user_message_content = user_message_content;
 
             let prompt_content = format!(
                 r#"Use the following search results to answer the query. If information is insufficient, state that.;
@@ -350,7 +382,7 @@ pub async fn handler(
 
             user_message_content
         } else {
-            user_message.content.clone()
+            user_message_content
         };
 
         messages.push(OpenAIMessage {
@@ -425,9 +457,11 @@ pub async fn handler(
             chat_id: chat.id.unwrap(),
             timestamp: Utc::now(),
         };
+
         let task2_state = Arc::clone(&task_state);
         let task_message = assistant_message.clone();
         let task_tx = tx.clone();
+        let task_memories = memories.clone();
         tokio::spawn(async move {
             task2_state
                 .database()
@@ -437,27 +471,20 @@ pub async fn handler(
                 .unwrap();
 
             tokio::spawn(async move {
-                let memories = task2_state
-                    .database()
-                    .memories
-                    .get_many(doc! { "user_id": user_id })
-                    .await
-                    .unwrap()
-                    .map_ok(|memory| memory.content)
-                    .try_collect::<Vec<String>>()
-                    .await
-                    .unwrap();
+                let prompt = format!("You are an AI Memory Assistant. Your task is to:
+1. Analyze the current user message.
+2. If there is an existing memory in [Existing memories] that directly pertains to the message, output NONE.
+3. If no relevant memory exists, but the message contains important information (e.g., goals, preferences, or facts), generate a new concise memory statement.
+4. If there are multiple memories you see in a single message, output the most important one.
+5. Otherwise, output NONE.
 
-                let prompt = format!("Here are some examples of user messages and their extracted concise memory statements:
-    input: Hey there! I am building an AI chat.
-    output: User is building an AI chat.
-    input: I prefer dark mode and hate popups.
-    output: User prefers dark mode and hates popups.
-    Task:
-    If the following message contains important information (e.g., goals, preferences, or facts), generate a new concise memory statement. If there are multiple memories, output the most important one. Otherwise, output \"NONE\". If the memory already exists, also output \"NONE\".
-    Memories: {};
-    Message: \"{}\"
-    Output:", if memories.is_empty() { "No memories yet".to_string() } else { serde_json::to_string(&memories).unwrap() }, payload.message.trim());
+Memory format (do NOT include braces): [Concise memory statement, single sentence]. Do not include any additional tokens in the output, except for the memory.
+For example: Input - Hey there! I am building an AI chat., Output - User is building an AI chat.
+
+Existing memories: {};
+
+Current user message: {:?}
+Your output:", if task_memories.is_empty() { "No memories yet".to_string() } else { serde_json::to_string(&task_memories).unwrap() }, payload.message.trim());
 
                 let memory = OpenAIClient::new(
                     env::var("CHUTES_KEY").unwrap(),
@@ -472,11 +499,26 @@ pub async fn handler(
                 .await
                 .unwrap();
 
-                if memory == "NONE" {
+                if memory.trim().starts_with("NONE") {
                     return;
                 }
 
-                task2_state
+                let memory = if memory.starts_with('[') {
+                    &memory[1..]
+                } else {
+                    &memory
+                };
+                let memory = if memory.ends_with(']') {
+                    &memory[..(memory.len() - 1)]
+                } else if memory.ends_with("].") {
+                    &format!("{}.", &memory[..(memory.len() - 2)])
+                } else {
+                    memory
+                };
+
+                let memory = memory.to_string();
+
+                let memory_id = task2_state
                     .database()
                     .memories
                     .create(Memory {
@@ -497,7 +539,12 @@ pub async fn handler(
                     .unwrap();
 
                 let _ = task_tx
-                    .send_async(ApiDelta::Control(ControlChunk::MemoryAdded { memory }))
+                    .send_async(ApiDelta::Control(ControlChunk::MemoryAdded {
+                        memory: MemoryPayload {
+                            id: memory_id,
+                            content: memory,
+                        },
+                    }))
                     .await;
             });
         });

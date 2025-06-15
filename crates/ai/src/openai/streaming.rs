@@ -51,6 +51,7 @@ impl OpenAIClient {
             .await?;
         if request.status() != StatusCode::OK {
             let status = request.status();
+            println!("INFERENCE ERROR: {}", request.text().await.unwrap());
             anyhow::bail!(status)
         }
         let bytes_stream = request.bytes_stream();

@@ -2,6 +2,7 @@ import { BACKEND_URI } from "../constants";
 import type { ChatMessage } from "../model/message";
 import type { Model } from "../model/service";
 import { useChatsStore } from "../state/chats";
+import { useMemoryStore } from "../state/memory";
 import { useServiceStore } from "../state/service";
 import type { ListWindow } from "../util";
 import { is, subscribeToStream } from "./completions";
@@ -64,6 +65,7 @@ export const sendAndSubscribe = async (
     setChatState,
   } = useChatsStore.getState();
   const { setInferenceError, removeInferenceError } = useServiceStore.getState();
+  const { addMemory } = useMemoryStore.getState();
   const provider = model.base_url;
   removeInferenceError("openrouter");
   const { stream_id, user_message } = await createMessage(chatId, payload);
@@ -123,6 +125,7 @@ export const sendAndSubscribe = async (
           JSON.stringify(control.control.memory),
         );
         updatePendingMessageMemory(chatId, control.control.memory.content);
+        addMemory(control.control.memory);
       }
     },
     (message) => {

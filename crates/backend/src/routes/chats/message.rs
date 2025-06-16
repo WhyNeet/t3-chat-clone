@@ -47,6 +47,7 @@ pub struct PromptCompletionPayload {
     pub model: String,
     pub reasoning: Option<ReasoningEffort>,
     pub use_search: bool,
+    pub use_memories: bool,
 }
 
 pub async fn handler(
@@ -229,16 +230,20 @@ pub async fn handler(
 
     let (tx, rx) = flume::unbounded();
 
-    let memories = state
-        .database()
-        .memories
-        .get_many(doc! { "user_id": user_id })
-        .await
-        .unwrap()
-        .map_ok(|memory| memory.content)
-        .try_collect::<Vec<String>>()
-        .await
-        .unwrap();
+    let memories = if payload.use_memories {
+        state
+            .database()
+            .memories
+            .get_many(doc! { "user_id": user_id })
+            .await
+            .unwrap()
+            .map_ok(|memory| memory.content)
+            .try_collect::<Vec<String>>()
+            .await
+            .unwrap()
+    } else {
+        vec![]
+    };
 
     let mut user_message_full_content = vec![ChatMessageContent::Text {
         value: payload.message.clone(),
@@ -331,18 +336,25 @@ pub async fn handler(
             .unwrap();
 
         let mut user_message_content = user_message.content.clone();
-        let user_message_text = format!(
-            "If necessary, you may use the following memories about the user to answer: {};\n{}",
-            if memories.is_empty() {
-                "No memories yet.".to_string()
-            } else {
-                serde_json::to_string(&memories).unwrap()
-            },
+        let user_message_text = if payload.use_memories {
+            format!(
+                "If necessary, you may use the following memories about the user to answer: {};\n{}",
+                if memories.is_empty() {
+                    "No memories yet.".to_string()
+                } else {
+                    serde_json::to_string(&memories).unwrap()
+                },
+                match &user_message_content[0] {
+                    ChatMessageContent::Text { value } => value,
+                    _ => unreachable!(),
+                }
+            )
+        } else {
             match &user_message_content[0] {
-                ChatMessageContent::Text { value } => value,
+                ChatMessageContent::Text { value } => value.to_string(),
                 _ => unreachable!(),
             }
-        );
+        };
 
         user_message_content[0] = ChatMessageContent::Text {
             value: user_message_text,
@@ -470,6 +482,9 @@ pub async fn handler(
                 .await
                 .unwrap();
 
+            if !payload.use_memories {
+                return;
+            }
             tokio::spawn(async move {
                 let prompt = format!("You are an AI Memory Assistant. Your task is to:
 1. Analyze the current user message.

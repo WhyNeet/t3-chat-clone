@@ -1,6 +1,6 @@
 use std::{env, process, sync::Arc};
 
-use ai::openai::streaming::OpenAIClient;
+use ai::openai::client::OpenAIClient;
 use axum::Router;
 
 use backend::{

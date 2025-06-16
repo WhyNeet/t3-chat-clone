@@ -2,12 +2,12 @@ use std::{env, str::FromStr, sync::Arc, time::Duration};
 
 use aes_gcm::{Aes256Gcm, Key, KeyInit, aead::AeadMut};
 use ai::openai::{
+    client::OpenAIClient,
     completions::{
         OpenAICompletionDelta, OpenAIMessage, OpenAIMessageContent, OpenAIMessageContentFile,
         OpenAIMessageImageUrl, OpenRouterRequestPdfPlugin, OpenRouterRequestPlugin,
         ReasoningEffort,
     },
-    streaming::OpenAIClient,
 };
 use axum::{
     Json,

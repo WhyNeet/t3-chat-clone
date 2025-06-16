@@ -7,7 +7,7 @@ use std::{
 use crate::{
     config::ModelsConfig, search::WebSearch, state::database::Database, streaming::ApiDelta,
 };
-use ai::openai::streaming::OpenAIClient;
+use ai::openai::client::OpenAIClient;
 use mongodb::{
     Client,
     gridfs::GridFsBucket,

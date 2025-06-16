@@ -11,9 +11,10 @@ import type { ApiError } from "./error";
 export async function fetchChatMessages(
   chatId: string,
   window: ListWindow,
+  share_id?: string
 ): Promise<ChatMessage[] | ApiError> {
   const response = await fetch(
-    `${BACKEND_URI}/chats/${chatId}/messages?start=${Math.floor(window.start)}&take=${Math.floor(window.take)}`,
+    `${BACKEND_URI}/chats/${chatId}/messages?start=${Math.floor(window.start)}&take=${Math.floor(window.take)}${share_id ? `&share_id=${share_id}` : ""}`,
     {
       credentials: "include",
     },
@@ -29,6 +30,7 @@ export interface SendMessagePayload {
   model: string;
   reasoning: "high" | "medium" | "low" | null;
   use_search: boolean;
+  use_memories: boolean;
 }
 
 export async function createMessage(

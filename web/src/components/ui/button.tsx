@@ -37,7 +37,7 @@ export const button = cva(
           "text-pink-950",
           "font-semibold",
           "border",
-          "border-pink-900",
+          "border-pink-900/20",
           "disabled:bg-slate-300",
           "disabled:border-slate-400",
           "disabled:text-slate-400",

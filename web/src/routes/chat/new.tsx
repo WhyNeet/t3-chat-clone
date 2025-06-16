@@ -7,6 +7,8 @@ import { useServiceStore } from "../../lib/state/service";
 import { sendAndSubscribe } from "../../lib/api/messages";
 import { Fragment } from "react/jsx-runtime";
 import { lazy } from "react";
+import { ChatShare } from "../../components/chat-share";
+import { Memories } from "../../components/memories";
 
 const Prompt = lazy(() => import("../../components/prompt"));
 
@@ -27,6 +29,7 @@ export function NewChat() {
         model: models!.free[0].identifier,
         reasoning: null,
         use_search: false,
+        use_memories: localStorage.getItem("use-memories") !== null
       },
       () => { },
     );
@@ -81,6 +84,10 @@ export function NewChat() {
             </Fragment>
           ))}
         </div>
+      </div>
+      <div className="absolute top-3 right-3 z-50 flex gap-2">
+        <ChatShare id={null} />
+        <Memories />
       </div>
       <div className="absolute bottom-0 flex justify-center inset-x-0 px-1 md:px-5 lg:px-10">
         <Prompt />

@@ -4,7 +4,6 @@ import { ChatsSidebar, useSidebarStore } from "../components/chats-sidebar";
 import { ChevronRight } from "lucide-react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { cn } from "../components/utils";
-import { Memories } from "../components/memories";
 import { Logo } from "../components/logo";
 
 export function App() {
@@ -61,9 +60,6 @@ export function App() {
               className="h-5 w-5 text-pink-900 transition duration-200"
             />
           </Button>
-        </div>
-        <div className="fixed top-3 right-3 z-50">
-          <Memories />
         </div>
         <Outlet />
       </div>

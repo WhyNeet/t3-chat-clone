@@ -31,6 +31,13 @@ const router = createBrowserRouter([
             },
           },
           {
+            path: "chat/shared/:chatId",
+            lazy: async () => {
+              const Component = await import("./routes/chat/shared").then(m => m.SharedChat);
+              return { Component };
+            },
+          },
+          {
             path: "settings",
             Component: Settings,
           },

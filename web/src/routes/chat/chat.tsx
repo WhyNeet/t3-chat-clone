@@ -9,6 +9,8 @@ import { AlertCircle, CircleAlert, Globe, Sparkle } from "lucide-react";
 import { useServiceStore } from "../../lib/state/service";
 import { useLocation } from "react-router";
 import { listUnsentFiles } from "../../lib/api/files";
+import { ChatShare } from "../../components/chat-share";
+import { Memories } from "../../components/memories";
 
 const Message = lazy(() => import("../../components/message"));
 const Prompt = lazy(() => import("../../components/prompt"));
@@ -252,6 +254,10 @@ export function Chat() {
             <p>Failed to load messages: {batchLoadError}.</p>
           </div>
         ) : null}
+      </div>
+      <div className="absolute top-3 right-3 z-50 flex gap-2">
+        <ChatShare id={chatId} />
+        <Memories />
       </div>
       <div className="absolute bottom-0 flex justify-center inset-x-0 px-1 md:px-5 lg:px-10">
         <Prompt />

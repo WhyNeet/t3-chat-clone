@@ -21,7 +21,6 @@ export const Memories = () => {
   return <Dialog>
     <DialogTrigger asChild>
       <Button
-        onClick={() => { }}
         intent="ghost"
         size="square"
         rounded="circle"

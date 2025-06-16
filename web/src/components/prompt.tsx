@@ -5,6 +5,7 @@ import {
   ChevronDownIcon,
   CircleAlert,
   Command,
+  Database,
   FileText,
   Globe,
   Key,
@@ -49,6 +50,12 @@ export default function Prompt() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const keys = useServiceStore(state => state.keys);
+  const [useMemories, setUseMemories] = useState(localStorage.getItem("use-memories") !== null);
+
+  useEffect(() => {
+    if (useMemories) localStorage.setItem("use-memories", "");
+    else localStorage.removeItem("use-memories");
+  }, [useMemories])
 
   const handleUploadClick = () => {
     if (!uploadInputRef.current) return;
@@ -113,6 +120,7 @@ export default function Prompt() {
           model: selectedModel.identifier,
           reasoning: isReasoning ? "medium" : null,
           use_search: useSearch,
+          use_memories: useMemories
         },
         () => setIsRequesting(false),
       );
@@ -128,6 +136,7 @@ export default function Prompt() {
           model: selectedModel.identifier,
           reasoning: isReasoning ? "medium" : null,
           use_search: useSearch,
+          use_memories: useMemories
         },
         () => setIsRequesting(false),
       );
@@ -228,7 +237,7 @@ export default function Prompt() {
                       <button
                         onClick={() => handleModelSelectorClick(model)}
                         disabled={keys !== null && keys.length === 0}
-                        className="py-3 px-4 pr-2 hover:bg-pink-900/10 rounded-md transition cursor-pointer disabled:opacity-60 whitespace-nowrap text-left"
+                        className="py-3 px-4 pr-2 hover:bg-pink-900/10 rounded-md transition cursor-pointer disabled:opacity-50 whitespace-nowrap text-left"
                         key={model.identifier}
                       >
                         <div className="text-xs font-display font-medium text-pink-900/60 flex items-center gap-1 h-4">
@@ -278,6 +287,18 @@ export default function Prompt() {
             >
               <Globe className="h-4 w-4" />
               Web Search
+            </Button>
+            <Button
+              onClick={() => setUseMemories((prev) => !prev)}
+              intent="ghost"
+              size="small"
+              className={cn(
+                "gap-1.5 border-pink-900/20 border rounded-full text-pink-900 transition",
+                useMemories ? "hover:bg-pink-900/10 bg-pink-800/10" : "",
+              )}
+            >
+              <Database className="h-4 w-4" />
+              Memories
             </Button>
             <Tooltip>
               <TooltipTrigger asChild>

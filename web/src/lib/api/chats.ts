@@ -1,5 +1,6 @@
 import { BACKEND_URI } from "../constants";
 import type { Chat } from "../model/chat";
+import type { Share } from "../model/share";
 import type { ListWindow } from "../util";
 
 export async function chats(window: ListWindow): Promise<Chat[]> {
@@ -12,6 +13,17 @@ export async function chats(window: ListWindow): Promise<Chat[]> {
   const chats = await response.json();
 
   return chats;
+}
+
+export async function getChatShate(id: string, share_id?: string): Promise<Chat | null> {
+  const response = await fetch(`${BACKEND_URI}/chats/${id}${share_id ? `?share_id=${share_id}` : ""}`, {
+    credentials: "include",
+    method: "GET",
+  });
+  if (!response.ok) return null;
+  const chat = await response.json();
+
+  return chat;
 }
 
 export async function createChat(): Promise<Chat> {
@@ -39,5 +51,33 @@ export async function renameChat(id: string, name: string): Promise<void> {
     headers: {
       "Content-Type": "application/json",
     },
+  });
+}
+
+export async function shareChat(id: string): Promise<Share> {
+  const response = await fetch(`${BACKEND_URI}/chats/${id}/share`, {
+    credentials: "include",
+    method: "POST",
+  });
+  const { id: share_id } = await response.json();
+
+  return { share_id, id };
+}
+
+export async function getShareState(id: string): Promise<Share | null> {
+  const response = await fetch(`${BACKEND_URI}/chats/${id}/share`, {
+    credentials: "include",
+    method: "GET",
+  });
+  if (!response.ok) return null;
+  const share = await response.json();
+
+  return share;
+}
+
+export async function unshareChat(id: string, share_id: string): Promise<void> {
+  await fetch(`${BACKEND_URI}/chats/${id}/share/${share_id}`, {
+    credentials: "include",
+    method: "DELETE",
   });
 }

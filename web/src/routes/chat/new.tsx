@@ -6,7 +6,9 @@ import { createChat } from "../../lib/api/chats";
 import { useServiceStore } from "../../lib/state/service";
 import { sendAndSubscribe } from "../../lib/api/messages";
 import { Fragment } from "react/jsx-runtime";
-import { Prompt } from "../../components/prompt";
+import { lazy } from "react";
+
+const Prompt = lazy(() => import("../../components/prompt"));
 
 export function NewChat() {
   const navigate = useNavigate();

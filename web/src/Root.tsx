@@ -4,8 +4,6 @@ import { Layout } from "./Layout";
 import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router";
 import { Signup } from "./routes/auth/signup";
-import { Chat } from "./routes/chat/chat";
-import { NewChat } from "./routes/chat/new";
 import { Settings } from "./routes/settings";
 import { KeysSettings } from "./routes/settings/keys";
 import { ThemesSettings } from "./routes/settings/themes";
@@ -20,11 +18,17 @@ const router = createBrowserRouter([
         children: [
           {
             path: "",
-            Component: NewChat
+            lazy: async () => {
+              const Component = await import("./routes/chat/new").then(m => m.NewChat);
+              return { Component };
+            },
           },
           {
             path: "chat/:chatId",
-            Component: Chat
+            lazy: async () => {
+              const Component = await import("./routes/chat/chat").then(m => m.Chat);
+              return { Component };
+            },
           },
           {
             path: "settings",

@@ -1,16 +1,17 @@
 import { useParams } from "react-router";
-import { useEffect, useRef, useState } from "react";
+import { lazy, useEffect, useRef, useState } from "react";
 import { fetchChatMessages } from "../../lib/api/messages";
 import { isError } from "../../lib/api/error";
 import { Role } from "../../lib/model/message";
-import { Message } from "../../components/message";
 import { useChatsStore } from "../../lib/state/chats";
 import { Loader } from "../../components/ui/loader";
 import { AlertCircle, CircleAlert, Globe, Sparkle } from "lucide-react";
 import { useServiceStore } from "../../lib/state/service";
-import { Prompt } from "../../components/prompt";
 import { useLocation } from "react-router";
 import { listUnsentFiles } from "../../lib/api/files";
+
+const Message = lazy(() => import("../../components/message"));
+const Prompt = lazy(() => import("../../components/prompt"));
 
 export function Chat() {
   const scrollWrapper = useRef<HTMLDivElement>(null);

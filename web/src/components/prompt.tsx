@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import { deleteFile, getFileUri, uploadFile } from "../lib/api/files";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
-export function Prompt() {
+export default function Prompt() {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const addChat = useChatsStore((state) => state.initializeChat);

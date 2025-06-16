@@ -51,6 +51,7 @@ export function Signup() {
           placeholder="Email"
           type="text"
           className="w-full"
+          autoComplete="off"
           {...register("email", {
             required: { value: true, message: "Required." },
             pattern: {
@@ -93,7 +94,7 @@ export function Signup() {
           disabled={isSubmitting}
           type="submit"
         >
-          {isSubmitting ? <Loader className="text-pink-950 h-5 w-5" /> : null}
+          {isSubmitting ? <Loader className="h-5 w-5" /> : null}
           Sign Up
         </Button>
         {error ? (

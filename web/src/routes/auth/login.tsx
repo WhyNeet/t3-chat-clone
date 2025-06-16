@@ -71,7 +71,7 @@ export function Login() {
         />
         {errors.password ? <p className="text-red-500 text-sm font-medium">{errors.password.message}</p> : null}
         <Button intent="primary" className="mt-6" disabled={isSubmitting} type="submit">
-          {isSubmitting ? <Loader className="text-pink-950 h-5 w-5" /> : null}
+          {isSubmitting ? <Loader className="h-5 w-5" /> : null}
           Log In
         </Button>
         {error ? (

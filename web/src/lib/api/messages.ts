@@ -1,4 +1,5 @@
 import { BACKEND_URI } from "../constants";
+import type { Memory } from "../model/memory";
 import type { ChatMessage } from "../model/message";
 import type { Model } from "../model/service";
 import { useChatsStore } from "../state/chats";
@@ -135,7 +136,7 @@ export const sendAndSubscribe = async (
       const memoryString = localStorage.getItem(
         `streaming-message-${chatId}-memory`
       );
-      const memory = memoryString ? JSON.parse(memoryString) : null;
+      const memory: Memory | null = memoryString ? JSON.parse(memoryString) : null;
 
       localStorage.removeItem(`stream-${chatId}`);
       localStorage.removeItem(`streaming-message-${chatId}`);
@@ -146,7 +147,7 @@ export const sendAndSubscribe = async (
         `streaming-message-${chatId}-memory`
       );
       clearPendingMessage(chatId);
-      addMessages(chatId, [{ ...message, updated_memory: memory }]);
+      addMessages(chatId, [{ ...message, updated_memory: memory?.content ?? null }]);
       setChatState(chatId, { status: "success" });
     },
   );

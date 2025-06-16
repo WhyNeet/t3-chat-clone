@@ -78,7 +78,7 @@ export function SharedChat() {
 
           if (batch.length < Math.floor(window.innerHeight / 100))
             isLastBatch.current = true;
-          setMessages(prev => [...prev, ...messages]);
+          setMessages(prev => [...prev, ...batch]);
           setBatchLoading(false);
           batchLoadingInternal.current = false;
         });

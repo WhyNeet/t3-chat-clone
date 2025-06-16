@@ -28,7 +28,7 @@ export const ChatShare = ({ id }: { id: string | null }) => {
 export const ChatShareState = ({ id }: { id: string }) => {
   const [shareState, setShareState] = useState<Share | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const link = shareState ? ((import.meta.env.DEV ? "http://localhost:5173/" : "https://whychat.vercel.app/") + (`chat/${shareState.id}?id=${shareState.share_id}`)) : null;
+  const link = shareState ? ((import.meta.env.DEV ? "http://localhost:5173/" : "https://whychat.vercel.app/") + (`chat/shared/${shareState.id}?id=${shareState.share_id}`)) : null;
 
   useEffect(() => {
     setIsLoading(true)

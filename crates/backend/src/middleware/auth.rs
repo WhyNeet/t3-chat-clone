@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use axum::{
     body::Body,
@@ -6,15 +6,14 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
-use hmac::Mac;
 use model::session::Session as SessionModel;
-use mongodb::BoxFuture;
+use mongodb::{BoxFuture, bson::oid::ObjectId};
 use redis_om::HashModel;
 use tower::{Layer, Service};
 use uuid::Uuid;
 
 use crate::{
-    routes::auth::{HmacSha256, SESSION_ID_COOKIE_NAME, SessionId},
+    routes::auth::{SESSION_ID_COOKIE_NAME, SessionId},
     state::AppState,
 };
 #[derive(Clone)]
@@ -87,23 +86,18 @@ where
             });
         };
 
-        let mut mac = HmacSha256::new_from_slice(self.state.hmac_key()).unwrap();
-
-        mac.update(session_id.as_bytes());
-        let Ok(signature) = hex::decode(signature) else {
-            let fut = self.inner.call(request);
-            return Box::pin(async move {
-                let res = fut.await?;
-                Ok(res)
-            });
-        };
-        let session_id: Option<SessionId> = if mac.verify_slice(&signature).is_ok() {
+        let session_id: Option<SessionId> = if self
+            .state
+            .crypto()
+            .verify_session_signature(session_id.as_bytes(), signature.as_bytes())
+            .unwrap_or(false)
+        {
             Uuid::parse_str(session_id).ok()
         } else {
             None
         };
         let mut inner = self.inner.clone();
-        let mut conn = self.state.redis();
+        let mut conn = self.state.storage().cache().connection();
         Box::pin(async move {
             if let Some(session_id) = session_id {
                 let session = SessionModel::get(&session_id.to_string(), &mut conn).await;
@@ -119,28 +113,12 @@ where
     }
 }
 
-pub struct Auth(pub SessionModel);
+pub struct SessionData {
+    pub session_id: String,
+    pub user_id: ObjectId,
+}
 
-// impl<S> FromRequest<S> for Auth
-// where
-//     S: Send + Sync,
-// {
-//     type Rejection = StatusCode;
-
-//     fn from_request(
-//         req: Request<Body>,
-//         _state: &S,
-//     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
-//         async move {
-//             let s = req
-//                 .extensions()
-//                 .get::<SessionModel>()
-//                 .ok_or(StatusCode::UNAUTHORIZED)?
-//                 .clone();
-//             Ok(Self(s))
-//         }
-//     }
-// }
+pub struct Auth(pub SessionData);
 
 impl<S> FromRequestParts<S> for Auth
 where
@@ -157,6 +135,9 @@ where
             .get::<SessionModel>()
             .ok_or(StatusCode::UNAUTHORIZED)?
             .clone();
-        Ok(Self(s))
+        Ok(Self(SessionData {
+            session_id: s.id,
+            user_id: ObjectId::from_str(&s.user_id).unwrap(),
+        }))
     }
 }

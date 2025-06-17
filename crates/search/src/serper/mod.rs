@@ -1,15 +1,20 @@
 use serde::{Deserialize, Serialize};
 
-pub struct WebSearch {
+use crate::{SearchClient, WebSearchOptions, WebSearchResult};
+
+pub struct SerperSearchClient {
     key: String,
 }
 
-impl WebSearch {
+impl SerperSearchClient {
     pub fn new(key: String) -> Self {
         Self { key }
     }
+}
 
-    pub async fn search(&self, query: String) -> anyhow::Result<SerperResult> {
+#[async_trait::async_trait]
+impl SearchClient for SerperSearchClient {
+    async fn search(&self, options: WebSearchOptions) -> anyhow::Result<Vec<WebSearchResult>> {
         let client = reqwest::Client::builder().build()?;
 
         let mut headers = reqwest::header::HeaderMap::new();
@@ -17,9 +22,9 @@ impl WebSearch {
         headers.insert("Content-Type", "application/json".parse()?);
 
         let data = SerperRequest {
-            q: query,
-            gl: "us".to_string(),
-            hl: "en".to_string(),
+            q: options.query,
+            gl: options.region,
+            hl: options.language,
         };
 
         let request = client
@@ -30,7 +35,15 @@ impl WebSearch {
         let response = request.send().await?;
         let body: SerperResult = response.json().await?;
 
-        Ok(body)
+        Ok(body
+            .organic
+            .into_iter()
+            .map(|result| WebSearchResult {
+                title: result.title,
+                link: result.link,
+                snippet: result.snippet,
+            })
+            .collect())
     }
 }
 

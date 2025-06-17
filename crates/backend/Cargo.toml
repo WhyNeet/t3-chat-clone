@@ -34,3 +34,5 @@ reqwest = "0.12.20"
 aes-gcm = "0.10.3"
 tokio-util = "0.7.15"
 base64 = "0.22.1"
+search = { path = "../search" }
+thiserror = "2.0.12"

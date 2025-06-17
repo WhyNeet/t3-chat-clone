@@ -1,5 +1,6 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
+use anyhow::anyhow;
 use axum::{
     Json,
     extract::{Path, State},
@@ -9,23 +10,32 @@ use futures::TryStreamExt;
 use mongodb::bson::{doc, oid::ObjectId};
 use reqwest::StatusCode;
 
-use crate::{middleware::auth::Auth, payload::upload::UserUploadPayload, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, database::DatabaseError},
+    },
+    middleware::auth::Auth,
+    payload::upload::UserUploadPayload,
+    state::AppState,
+};
 
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Auth(session): Auth,
     Path(chat_id): Path<ObjectId>,
-) -> impl IntoResponse {
-    let user_id = ObjectId::from_str(&session.user_id).unwrap();
-    let Ok(uploads) = state
+) -> Result<impl IntoResponse, ApplicationError> {
+    let uploads = state
+        .storage()
         .database()
         .uploads
-        .get_many(doc! { "chat_id": chat_id, "user_id": user_id, "is_sent": false })
+        .get_many(doc! { "chat_id": chat_id, "user_id": session.user_id, "is_sent": false })
         .await
-    else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
-    let Ok(uploads) = uploads
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
+
+    let uploads = uploads
         .map_ok(|upload| UserUploadPayload {
             id: upload.id,
             chat_id: upload.chat_id,
@@ -34,27 +44,30 @@ pub async fn handler(
         })
         .try_collect::<Vec<UserUploadPayload>>()
         .await
-    else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                anyhow!(e),
+            )))
+        })?;
 
-    (StatusCode::OK, Json(uploads)).into_response()
+    Ok((StatusCode::OK, Json(uploads)).into_response())
 }
 
 pub async fn no_chat_id_handler(
     State(state): State<Arc<AppState>>,
     Auth(session): Auth,
-) -> impl IntoResponse {
-    let user_id = ObjectId::from_str(&session.user_id).unwrap();
-    let Ok(uploads) = state
+) -> Result<impl IntoResponse, ApplicationError> {
+    let uploads = state
+        .storage()
         .database()
         .uploads
-        .get_many(doc! { "chat_id": null, "user_id": user_id, "is_sent": false })
+        .get_many(doc! { "chat_id": null, "user_id": session.user_id, "is_sent": false })
         .await
-    else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
-    let Ok(uploads) = uploads
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
+
+    let uploads = uploads
         .map_ok(|upload| UserUploadPayload {
             id: upload.id,
             chat_id: upload.chat_id,
@@ -63,9 +76,11 @@ pub async fn no_chat_id_handler(
         })
         .try_collect::<Vec<UserUploadPayload>>()
         .await
-    else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                anyhow!(e),
+            )))
+        })?;
 
-    (StatusCode::OK, Json(uploads)).into_response()
+    Ok((StatusCode::OK, Json(uploads)).into_response())
 }

@@ -1,22 +1,29 @@
 use std::sync::Arc;
 
-use axum::{Json, extract::State, response::IntoResponse};
+use axum::{extract::State, response::IntoResponse};
 use model::session::Session;
 use redis_om::HashModel;
 use reqwest::StatusCode;
-use serde_json::json;
 
-use crate::{middleware::auth::Auth, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, cache::CacheError},
+    },
+    middleware::auth::Auth,
+    state::AppState,
+};
 
-pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) -> impl IntoResponse {
-    let mut conn = state.redis();
-    if Session::delete(session.id, &mut conn).await.is_err() {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Failed to delete session." })),
-        )
-            .into_response();
-    };
+pub async fn handler(
+    State(state): State<Arc<AppState>>,
+    Auth(session): Auth,
+) -> Result<impl IntoResponse, ApplicationError> {
+    let mut conn = state.storage().cache().connection();
+    Session::delete(session.session_id, &mut conn)
+        .await
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::CacheError(CacheError::Unknown(e)))
+        })?;
 
-    (StatusCode::OK).into_response()
+    Ok((StatusCode::OK).into_response())
 }

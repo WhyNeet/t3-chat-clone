@@ -14,12 +14,12 @@ use super::completions::OpenRouterRequestPlugin;
 #[derive(Debug, Clone)]
 pub struct OpenAIClient {
     key: String,
-    endpoint: String,
+    base_url: String,
 }
 
 impl OpenAIClient {
-    pub fn new(key: String, endpoint: String) -> Self {
-        Self { key, endpoint }
+    pub fn new(key: String, base_url: String) -> Self {
+        Self { key, base_url }
     }
 
     pub async fn completion(
@@ -44,7 +44,7 @@ impl OpenAIClient {
         };
 
         let request = client
-            .post(self.endpoint)
+            .post(format!("{}/v1/chat/completions", self.base_url))
             .bearer_auth(self.key)
             .json(&openai_req_body)
             .send()
@@ -103,7 +103,7 @@ impl OpenAIClient {
         };
 
         let response = client
-            .post(self.endpoint)
+            .post(format!("{}/v1/completions", self.base_url))
             .bearer_auth(self.key)
             .json(&openai_req_body)
             .send()

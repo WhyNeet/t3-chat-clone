@@ -5,7 +5,7 @@ use mongodb::{Client, IndexModel, bson::doc, options::IndexOptions};
 
 use crate::data::mongodb::MongoDataAdapter;
 
-pub struct Database {
+pub struct DatabaseState {
     pub users: MongoDataAdapter<User>,
     pub chats: MongoDataAdapter<Chat>,
     pub messages: MongoDataAdapter<ChatMessage>,
@@ -14,8 +14,29 @@ pub struct Database {
     pub memories: MongoDataAdapter<Memory>,
 }
 
-impl Database {
+impl DatabaseState {
     pub async fn new(client: Client) -> anyhow::Result<Self> {
+        Self::migrate(&client).await?;
+
+        Ok(Self {
+            users: MongoDataAdapter::new(client.clone(), "chat".to_string(), "users".to_string()),
+            chats: MongoDataAdapter::new(client.clone(), "chat".to_string(), "chats".to_string()),
+            messages: MongoDataAdapter::new(
+                client.clone(),
+                "chat".to_string(),
+                "messages".to_string(),
+            ),
+            keys: MongoDataAdapter::new(client.clone(), "chat".to_string(), "keys".to_string()),
+            uploads: MongoDataAdapter::new(
+                client.clone(),
+                "chat".to_string(),
+                "uploads".to_string(),
+            ),
+            memories: MongoDataAdapter::new(client, "chat".to_string(), "memories".to_string()),
+        })
+    }
+
+    async fn migrate(client: &Client) -> anyhow::Result<()> {
         client.database("chat").create_collection("users").await?;
         client
             .database("chat")
@@ -59,21 +80,6 @@ impl Database {
             .create_index(IndexModel::builder().keys(doc! { "user_id": 1 }).build())
             .await?;
 
-        Ok(Self {
-            users: MongoDataAdapter::new(client.clone(), "chat".to_string(), "users".to_string()),
-            chats: MongoDataAdapter::new(client.clone(), "chat".to_string(), "chats".to_string()),
-            messages: MongoDataAdapter::new(
-                client.clone(),
-                "chat".to_string(),
-                "messages".to_string(),
-            ),
-            keys: MongoDataAdapter::new(client.clone(), "chat".to_string(), "keys".to_string()),
-            uploads: MongoDataAdapter::new(
-                client.clone(),
-                "chat".to_string(),
-                "uploads".to_string(),
-            ),
-            memories: MongoDataAdapter::new(client, "chat".to_string(), "memories".to_string()),
-        })
+        Ok(())
     }
 }

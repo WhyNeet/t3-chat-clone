@@ -1,5 +1,6 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
+use anyhow::anyhow;
 use axum::{
     Json,
     extract::{Multipart, Path, State},
@@ -9,38 +10,48 @@ use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use model::upload::UserUpload;
 use mongodb::bson::oid::ObjectId;
 use reqwest::StatusCode;
-use serde_json::json;
 use tokio::io::AsyncReadExt;
 use tokio_util::io::StreamReader;
 
-use crate::{middleware::auth::Auth, payload::upload::UserUploadPayload, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, database::DatabaseError},
+    },
+    middleware::auth::Auth,
+    payload::upload::UserUploadPayload,
+    state::AppState,
+};
 
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Auth(session): Auth,
     chat_id: Option<Path<ObjectId>>,
     mut multipart: Multipart,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApplicationError> {
     let chat_id = chat_id.map(|c| c.0);
-    let user_id = ObjectId::from_str(&session.user_id).unwrap();
     let _ = if let Some(chat_id) = chat_id {
-        let Ok(chat) = state.database().chats.get_by_id(chat_id).await else {
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        };
+        let chat = state
+            .storage()
+            .database()
+            .chats
+            .get_by_id(chat_id)
+            .await
+            .map_err(|e| {
+                ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                    e,
+                )))
+            })?;
         let Some(chat) = chat else {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "Chat does not exist." })),
-            )
-                .into_response();
+            return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+                DatabaseError::ChatDoesNotExist,
+            )));
         };
 
-        if chat.user_id != user_id {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "Chat does not belong to the user." })),
-            )
-                .into_response();
+        if chat.user_id != session.user_id {
+            return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+                DatabaseError::ChatDoesNotBelongToUser,
+            )));
         }
 
         Some(chat)
@@ -48,38 +59,32 @@ pub async fn handler(
         None
     };
 
-    let Ok(Some(file)) = multipart.next_field().await else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "File required." })),
-        )
-            .into_response();
-    };
+    let file = multipart
+        .next_field()
+        .await
+        .map_err(|_| ApplicationError::FileRequired)?
+        .ok_or(ApplicationError::FileRequired)?;
 
-    let Some(content_type) = file.content_type() else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Missing file content type." })),
-        )
-            .into_response();
-    };
-    let content_type = content_type.to_string();
+    let content_type = file
+        .content_type()
+        .ok_or(ApplicationError::NoFileContentType)?
+        .to_string();
 
     if !["image/jpeg", "image/png", "application/pdf"].contains(&content_type.as_str()) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Invalid file content type." })),
-        )
-            .into_response();
+        return Err(ApplicationError::InvalidFileContentType);
     }
 
-    let Ok(mut stream) = state.bucket().open_upload_stream("attachment").await else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Failed to initialize GridFS stream." })),
-        )
-            .into_response();
-    };
+    let mut stream = state
+        .storage()
+        .bucket()
+        .gridfs()
+        .open_upload_stream("attachment")
+        .await
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                anyhow!(e),
+            )))
+        })?;
 
     let file_stream = file.into_stream();
 
@@ -99,77 +104,59 @@ pub async fn handler(
                 size += n;
                 if size > 1_000_000 {
                     stream.abort().await.unwrap();
-                    return (
-                        StatusCode::BAD_REQUEST,
-                        Json(serde_json::json!({ "error": "File too large." })),
-                    )
-                        .into_response();
+                    return Err(ApplicationError::FileTooLarge);
                 }
                 // Write chunk into GridFS stream
-                if let Err(e) = stream.write(&buffer[..n]).await {
-                    return (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(
-                            serde_json::json!({ "error": format!("Failed to write to GridFS: {}", e) }),
-                        ),
-                    )
-                        .into_response();
-                }
+                stream.write(&buffer[..n]).await.map_err(|e| {
+                    ApplicationError::StorageError(StorageError::DatabaseError(
+                        DatabaseError::Unknown(anyhow!(e)),
+                    ))
+                })?;
             }
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": format!("Read error: {}", e) })),
-                )
-                    .into_response();
+                return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+                    DatabaseError::Unknown(anyhow!(e)),
+                )));
             }
         }
     }
 
-    if let Err(e) = stream.close().await {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(
-                serde_json::json!({ "error": format!("Failed to finalize GridFS upload: {}", e) }),
-            ),
-        )
-            .into_response();
-    }
+    stream.close().await.map_err(|e| {
+        ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+            anyhow!(e),
+        )))
+    })?;
 
     // create UserUpload
 
     let attachment_id = stream.id().as_object_id().unwrap();
 
-    if state
+    state
+        .storage()
         .database()
         .uploads
         .create(UserUpload {
             id: attachment_id,
             chat_id: chat_id,
-            user_id,
+            user_id: session.user_id,
             content_type: content_type.to_string(),
             is_sent: false,
         })
         .await
-        .is_err()
-    {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": "Failed to create upload." })),
-        )
-            .into_response();
-    }
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
     // created UserUpload
 
-    (
+    Ok((
         StatusCode::OK,
         Json(UserUploadPayload {
             id: attachment_id,
             chat_id,
             content_type,
-            user_id,
+            user_id: session.user_id,
         }),
     )
-        .into_response()
+        .into_response())
 }

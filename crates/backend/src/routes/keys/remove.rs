@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
     extract::{Path, State},
     response::IntoResponse,
 };
@@ -9,45 +8,55 @@ use model::key::UserApiKey;
 use mongodb::bson::oid::ObjectId;
 use redis_om::HashModel;
 use reqwest::StatusCode;
-use serde_json::json;
 
-use crate::{middleware::auth::Auth, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, database::DatabaseError},
+    },
+    middleware::auth::Auth,
+    state::AppState,
+};
 
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Auth(session): Auth,
     Path(key_id): Path<ObjectId>,
-) -> impl IntoResponse {
-    let Ok(key) = state.database().keys.get_by_id(key_id).await else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+) -> Result<impl IntoResponse, ApplicationError> {
+    let key = state
+        .storage()
+        .database()
+        .keys
+        .get_by_id(key_id)
+        .await
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
     let Some(key) = key else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Key does not exist." })),
-        )
-            .into_response();
+        return Err(ApplicationError::KeyDoesNotExist);
     };
 
-    if key.user_id.to_hex() != session.user_id {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Key does not belong to the user." })),
-        )
-            .into_response();
+    if key.user_id != session.user_id {
+        return Err(ApplicationError::KeyDoesNotBelongToUser);
     }
 
-    if state.database().keys.delete(key.id.unwrap()).await.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+    state
+        .storage()
+        .database()
+        .keys
+        .delete(key.id.unwrap())
+        .await
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
-    let mut conn = state.redis();
+    let mut conn = state.storage().cache().connection();
     let _ = UserApiKey::delete(
         format!("{}-{}", key.provider, key.user_id.to_hex()),
         &mut conn,
     )
     .await;
 
-    StatusCode::OK.into_response()
+    Ok(StatusCode::OK.into_response())
 }

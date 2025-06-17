@@ -1,71 +1,43 @@
 use std::{
     collections::HashMap,
+    env,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
 use crate::{
-    config::ModelsConfig, search::WebSearch, state::database::Database, streaming::ApiDelta,
+    models::ModelsConfig,
+    state::{crypto::CryptoState, inference::InferenceState, storage::StorageState},
+    streaming::ApiDelta,
 };
-use ai::openai::client::OpenAIClient;
-use mongodb::{
-    Client,
-    gridfs::GridFsBucket,
-    options::{GridFsBucketOptions, WriteConcern},
-};
-use redis_om::redis::aio::MultiplexedConnection;
+use anyhow::Context;
+use search::{SearchClient, serper::SerperSearchClient};
 use uuid::Uuid;
 
-pub mod database;
+pub mod crypto;
+pub mod inference;
+pub mod storage;
 
 pub struct AppState {
-    openrouter: OpenAIClient,
+    inference: InferenceState,
     streams: Arc<Mutex<HashMap<Uuid, flume::Receiver<ApiDelta>>>>,
-    database: Database,
-    redis: MultiplexedConnection,
-    hmac_key: Box<[u8]>,
-    aes_key: Box<[u8]>,
-    bucket: GridFsBucket,
+    storage: StorageState,
+    crypto: CryptoState,
     models: ModelsConfig,
-    search: WebSearch,
+    search: Arc<dyn SearchClient>,
 }
 
 impl AppState {
-    pub async fn new(
-        openrouter: OpenAIClient,
-        client: Client,
-        redis: redis_om::Client,
-        aes_key: Box<[u8]>,
-        hmac_key: Box<[u8]>,
-        search: WebSearch,
-    ) -> anyhow::Result<Self> {
-        let gridfs_opts = GridFsBucketOptions::builder()
-            .bucket_name("attachments".to_string())
-            .write_concern(
-                WriteConcern::builder()
-                    .w_timeout(Duration::new(5, 0))
-                    .build(),
-            )
-            .build();
-        let bucket = client.database("chat").gridfs_bucket(gridfs_opts);
-
-        let conn = redis.get_multiplexed_tokio_connection().await?;
-
+    pub async fn new() -> anyhow::Result<Self> {
         Ok(Self {
-            openrouter,
+            inference: InferenceState::new()?,
             streams: Default::default(),
-            database: Database::new(client).await?,
-            bucket,
-            redis: conn,
-            aes_key,
-            hmac_key,
+            storage: StorageState::new().await?,
+            crypto: CryptoState::new()?,
             models: ModelsConfig::new(),
-            search,
+            search: Arc::new(SerperSearchClient::new(
+                env::var("SERPER_KEY").context("Missing OpenRouter API key")?,
+            )),
         })
-    }
-
-    pub fn openrouter(&self) -> &OpenAIClient {
-        &self.openrouter
     }
 
     pub fn insert_stream(&self, id: Uuid, recv: flume::Receiver<ApiDelta>) {
@@ -80,31 +52,23 @@ impl AppState {
         self.streams.lock().unwrap().remove(id).is_some()
     }
 
-    pub fn redis(&self) -> MultiplexedConnection {
-        self.redis.clone()
-    }
-
-    pub fn hmac_key(&self) -> &[u8] {
-        &self.hmac_key
-    }
-
-    pub fn database(&self) -> &Database {
-        &self.database
-    }
-
     pub fn models(&self) -> &ModelsConfig {
         &self.models
     }
 
-    pub fn search(&self) -> &WebSearch {
-        &self.search
+    pub fn inference(&self) -> &InferenceState {
+        &self.inference
     }
 
-    pub fn aes_key(&self) -> &[u8] {
-        &self.aes_key
+    pub fn search(&self) -> &dyn SearchClient {
+        self.search.as_ref()
     }
 
-    pub fn bucket(&self) -> &GridFsBucket {
-        &self.bucket
+    pub fn storage(&self) -> &StorageState {
+        &self.storage
+    }
+
+    pub fn crypto(&self) -> &CryptoState {
+        &self.crypto
     }
 }

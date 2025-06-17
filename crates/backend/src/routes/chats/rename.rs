@@ -8,9 +8,15 @@ use axum::{
 use mongodb::bson::{doc, oid::ObjectId};
 use reqwest::StatusCode;
 use serde::Deserialize;
-use serde_json::json;
 
-use crate::{middleware::auth::Auth, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, database::DatabaseError},
+    },
+    middleware::auth::Auth,
+    state::AppState,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct ChatRenamePayload {
@@ -22,7 +28,7 @@ pub async fn handler(
     Auth(session): Auth,
     Path(chat_id): Path<ObjectId>,
     Json(payload): Json<ChatRenamePayload>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApplicationError> {
     let name = payload.name.trim().to_string();
     let name = if name.is_empty() {
         "New Chat".to_string()
@@ -30,34 +36,37 @@ pub async fn handler(
         name
     };
 
-    let Ok(chat) = state.database().chats.get_by_id(chat_id).await else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+    let chat = state
+        .storage()
+        .database()
+        .chats
+        .get_by_id(chat_id)
+        .await
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
+
     let Some(chat) = chat else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not exist." })),
-        )
-            .into_response();
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::ChatDoesNotExist,
+        )));
     };
 
-    if chat.user_id.to_hex() != session.user_id {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not belong to user." })),
-        )
-            .into_response();
+    if chat.user_id != session.user_id {
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::ChatDoesNotBelongToUser,
+        )));
     }
 
-    if state
+    state
+        .storage()
         .database()
         .chats
         .update(chat.id.unwrap(), doc! { "$set": { "name": name } })
         .await
-        .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
-    StatusCode::OK.into_response()
+    Ok(StatusCode::OK.into_response())
 }

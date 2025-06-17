@@ -1,24 +1,26 @@
 use std::sync::Arc;
 
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use axum_extra::extract::{
     CookieJar,
     cookie::{Cookie, SameSite},
 };
 use cookie::time::Duration;
-use hmac::Mac;
 use model::session::Session;
 use mongodb::bson::doc;
 use redis_om::HashModel;
 use serde::Deserialize;
-use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 
 use crate::{
+    errors::{
+        ApplicationError,
+        crypto::CryptoError,
+        storage::{StorageError, cache::CacheError, database::DatabaseError},
+    },
     payload::auth::UserPayload,
-    routes::auth::{HmacSha256, SESSION_EXPIRATION, SESSION_ID_COOKIE_NAME},
+    routes::auth::{SESSION_EXPIRATION, SESSION_ID_COOKIE_NAME},
     state::AppState,
 };
 
@@ -34,61 +36,57 @@ pub async fn handler(
     State(state): State<Arc<AppState>>,
     jar: CookieJar,
     Json(payload): Json<AuthLoginPayload>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApplicationError> {
     if let Err(errors) = payload.validate() {
-        return (StatusCode::BAD_REQUEST, Json(errors)).into_response();
+        return Ok((StatusCode::BAD_REQUEST, Json(errors)).into_response());
     }
 
     let Ok(user) = state
+        .storage()
         .database()
         .users
         .get(doc! { "email": payload.email })
         .await
     else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        return Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response());
     };
 
     let Some(user) = user else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "User does not exist." })),
-        )
-            .into_response();
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::UserAlreadyExists,
+        )));
     };
 
-    let hash = PasswordHash::new(&user.password).unwrap();
-    if Argon2::default()
-        .verify_password(payload.password.as_bytes(), &hash)
-        .is_err()
+    if !state
+        .crypto()
+        .verify_password(&user.password, payload.password.as_bytes())
+        .map_err(|e| ApplicationError::CryptoError(CryptoError::Unknown(e)))?
     {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Wrong password." })),
-        )
-            .into_response();
+        return Err(ApplicationError::CryptoError(CryptoError::WrongPassword));
     }
 
-    let session_id = Uuid::new_v4();
+    let session_id = Uuid::new_v4().to_string();
     let mut session = Session {
-        id: session_id.to_string(),
+        id: session_id.clone(),
         user_id: user.id.unwrap().to_hex(),
     };
-    let mut conn = state.redis();
-    if let Err(e) = session.save(&mut conn).await {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-            .into_response();
-    } else {
-        session.expire(SESSION_EXPIRATION, &mut conn).await.unwrap();
-    }
+    let mut conn = state.storage().cache().connection();
+    session.save(&mut conn).await.map_err(|e| {
+        ApplicationError::StorageError(StorageError::CacheError(CacheError::Unknown(e)))
+    })?;
 
-    let mut mac = HmacSha256::new_from_slice(state.hmac_key()).unwrap();
-    mac.update(session_id.to_string().as_bytes());
+    session
+        .expire(SESSION_EXPIRATION, &mut conn)
+        .await
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::CacheError(CacheError::Unknown(e)))
+        })?;
 
-    let signature = mac.finalize().into_bytes();
-    let signature = hex::encode(signature);
+    let signature = state
+        .crypto()
+        .sign_session(session_id.as_bytes())
+        .map_err(|e| ApplicationError::CryptoError(CryptoError::Unknown(e)))?;
+
     let cookie = Cookie::build((SESSION_ID_COOKIE_NAME, format!("{session_id}.{signature}")))
         .path("/")
         .same_site(SameSite::None)
@@ -97,7 +95,7 @@ pub async fn handler(
         .max_age(Duration::seconds(SESSION_EXPIRATION as i64))
         .build();
 
-    (
+    Ok((
         StatusCode::OK,
         jar.add(cookie),
         Json(UserPayload {
@@ -105,5 +103,5 @@ pub async fn handler(
             email: user.email,
         }),
     )
-        .into_response()
+        .into_response())
 }

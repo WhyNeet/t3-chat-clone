@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     Json,
@@ -11,7 +11,15 @@ use redis_om::HashModel;
 use reqwest::StatusCode;
 use serde::Deserialize;
 
-use crate::{middleware::auth::Auth, payload::chat::ChatPayload, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, cache::CacheError, database::DatabaseError},
+    },
+    middleware::auth::Auth,
+    payload::chat::ChatPayload,
+    state::AppState,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct GetChatStateQuery {
@@ -23,12 +31,12 @@ pub async fn handler(
     Auth(session): Auth,
     Path(chat_id): Path<ObjectId>,
     Query(payload): Query<GetChatStateQuery>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApplicationError> {
     let is_shared = if let Some(share_id) = payload.share_id {
-        let mut conn = state.redis();
-        let Ok(share) = Share::get(chat_id.to_hex(), &mut conn).await else {
-            return StatusCode::BAD_REQUEST.into_response();
-        };
+        let mut conn = state.storage().cache().connection();
+        let share = Share::get(chat_id.to_hex(), &mut conn).await.map_err(|e| {
+            ApplicationError::StorageError(StorageError::CacheError(CacheError::Unknown(e)))
+        })?;
 
         share.share_id == share_id.to_hex()
     } else {
@@ -36,23 +44,31 @@ pub async fn handler(
     };
 
     let chat = if is_shared {
-        state.database().chats.get(doc! { "_id": chat_id }).await
-    } else {
         state
+            .storage()
             .database()
             .chats
-            .get(doc! { "user_id": ObjectId::from_str(&session.user_id).unwrap(), "_id": chat_id })
+            .get(doc! { "_id": chat_id })
             .await
-    };
-    let Ok(chat) = chat else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+    } else {
+        state
+            .storage()
+            .database()
+            .chats
+            .get(doc! { "user_id": session.user_id, "_id": chat_id })
+            .await
+    }
+    .map_err(|e| {
+        ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+    })?;
 
     let Some(chat) = chat else {
-        return StatusCode::BAD_REQUEST.into_response();
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::ChatDoesNotExist,
+        )));
     };
 
-    (
+    Ok((
         StatusCode::OK,
         Json(ChatPayload {
             id: chat.id.unwrap(),
@@ -61,5 +77,5 @@ pub async fn handler(
             timestamp: chat.timestamp,
         }),
     )
-        .into_response()
+        .into_response())
 }

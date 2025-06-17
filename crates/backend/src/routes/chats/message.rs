@@ -1,6 +1,5 @@
-use std::{env, str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
-use aes_gcm::{Aes256Gcm, Key, KeyInit, aead::AeadMut};
 use ai::openai::{
     client::OpenAIClient,
     completions::{
@@ -9,6 +8,7 @@ use ai::openai::{
         ReasoningEffort,
     },
 };
+use anyhow::anyhow;
 use axum::{
     Json,
     extract::{Path, State},
@@ -18,7 +18,6 @@ use axum::{
 use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::Utc;
 use futures::{AsyncReadExt, StreamExt, TryStreamExt, future::join_all};
-use hmac::digest::generic_array::GenericArray;
 use model::{
     key::UserApiKey,
     memory::Memory,
@@ -27,17 +26,22 @@ use model::{
 };
 use mongodb::bson::{Bson, doc, oid::ObjectId};
 use redis_om::HashModel;
+use search::WebSearchOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, database::DatabaseError},
+    },
     middleware::auth::Auth,
     payload::{
         chat::{ChatMessageContentPayload, ChatMessagePayload},
         memories::MemoryPayload,
     },
-    state::AppState,
+    state::{AppState, inference::InferenceProvider},
     streaming::{ApiDelta, ControlChunk},
 };
 
@@ -55,9 +59,8 @@ pub async fn handler(
     Path(chat_id): Path<ObjectId>,
     Auth(session): Auth,
     Json(payload): Json<PromptCompletionPayload>,
-) -> impl IntoResponse {
-    let user_id = ObjectId::from_str(&session.user_id).unwrap();
-    let Some(model) = state
+) -> Result<impl IntoResponse, ApplicationError> {
+    let model = state
         .models()
         .free_models()
         .iter()
@@ -71,34 +74,27 @@ pub async fn handler(
                 .find(|model| model.identifier == payload.model)
                 .cloned()
         })
-    else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Model does not exist." })),
-        )
-            .into_response();
-    };
+        .ok_or(ApplicationError::InvalidModelIdentifier)?;
 
-    let Ok(chat) = state
+    let chat = state
+        .storage()
         .database()
         .chats
-        .get(doc! { "_id": chat_id, "user_id": ObjectId::from_str(&session.user_id).unwrap() })
+        .get(doc! { "_id": chat_id, "user_id": session.user_id })
         .await
-    else {
-        tracing::error!("Failed to get chat.");
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
     let Some(chat) = chat else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not exist." })),
-        )
-            .into_response();
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::ChatDoesNotExist,
+        )));
     };
 
     // MESSAGES
 
-    let Ok(messages) = state
+    let messages = state
+        .storage()
         .database()
         .messages
         .get_many_sorted(
@@ -106,12 +102,11 @@ pub async fn handler(
             doc! { "timestamp": -1 },
         )
         .await
-    else {
-        tracing::error!("Failed to get message.");
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
-    let Ok(mut messages) = messages
+    let mut messages = messages
         .collect::<Vec<_>>()
         .await
         .into_iter()
@@ -142,10 +137,11 @@ pub async fn handler(
             })
         })
         .collect::<Result<Vec<_>, mongodb::error::Error>>()
-    else {
-        tracing::error!("Failed to list message.");
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                anyhow!(e),
+            )))
+        })?;
 
     // FILES
 
@@ -154,19 +150,25 @@ pub async fn handler(
     } else {
         Some(chat.id.unwrap())
     };
-    let Ok(files) = state
+    let files = state
+        .storage()
         .database()
         .uploads
-        .get_many(doc! { "user_id": user_id, "chat_id": files_chat_id, "is_sent": false })
+        .get_many(doc! { "user_id": session.user_id, "chat_id": files_chat_id, "is_sent": false })
         .await
-    else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
-    let Ok(files) = files.try_collect::<Vec<UserUpload>>().await else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
+
+    let files = files.try_collect::<Vec<UserUpload>>().await.map_err(|e| {
+        ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+            anyhow!(e),
+        )))
+    })?;
+
     for file in files.iter() {
-        if state
+        state
+            .storage()
             .database()
             .uploads
             .update(
@@ -174,15 +176,16 @@ pub async fn handler(
                 doc! { "$set": { "chat_id": chat.id.unwrap(), "is_sent": true } },
             )
             .await
-            .is_err()
-        {
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        }
+            .map_err(|e| {
+                ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                    e,
+                )))
+            })?;
     }
 
     // API KEY
 
-    let mut conn = state.redis();
+    let mut conn = state.storage().cache().connection();
 
     let api_key = if let Ok(cached_key) =
         UserApiKey::get(format!("openrouter-{}", session.user_id), &mut conn).await
@@ -190,9 +193,10 @@ pub async fn handler(
         Some(cached_key.key)
     } else {
         let key = state
+            .storage()
             .database()
             .keys
-            .get(doc! { "user_id": ObjectId::from_str(&session.user_id).unwrap() })
+            .get(doc! { "user_id": session.user_id })
             .await
             .unwrap();
         if let Some(ref key) = key {
@@ -209,38 +213,33 @@ pub async fn handler(
     };
 
     let client = if let Some(api_key) = api_key {
-        let (nonce, ciphertext) = api_key.split_once('.').unwrap();
-        let nonce = hex::decode(nonce).unwrap();
-        let ciphertext = hex::decode(ciphertext).unwrap();
-
-        let key = Key::<Aes256Gcm>::from_slice(state.aes_key());
-        let mut cipher = Aes256Gcm::new(&key);
-        let plaintext = cipher
-            .decrypt(GenericArray::from_slice(&nonce), ciphertext.as_ref())
-            .unwrap();
-
-        if model.base_url.starts_with("https://openrouter.ai") {
-            OpenAIClient::new(String::from_utf8(plaintext).unwrap(), model.base_url)
-        } else {
-            todo!()
-        }
+        // currently, only OpenRouter API keys are supported
+        OpenAIClient::new(api_key, "https://openrouter.ai/api".to_string())
     } else {
-        state.openrouter().clone()
+        match model.provider {
+            InferenceProvider::OpenRouter => state.inference().openrouter.clone(),
+            InferenceProvider::Chutes => state.inference().chutes.clone(),
+        }
     };
 
     let (tx, rx) = flume::unbounded();
 
     let memories = if payload.use_memories {
         state
+            .storage()
             .database()
             .memories
-            .get_many(doc! { "user_id": user_id })
+            .get_many(doc! { "user_id": session.user_id })
             .await
             .unwrap()
             .map_ok(|memory| memory.content)
             .try_collect::<Vec<String>>()
             .await
-            .unwrap()
+            .map_err(|e| {
+                ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                    anyhow!(e),
+                )))
+            })?
     } else {
         vec![]
     };
@@ -276,18 +275,18 @@ pub async fn handler(
         let task_state = Arc::clone(&state);
         let task_tx = tx.clone();
         tokio::spawn(async move {
-            let chat_name = OpenAIClient::new(
-                env::var("CHUTES_KEY").unwrap(),
-                "https://llm.chutes.ai/v1/completions".to_string(),
-            )
-            .prompt_completion_non_streaming(
-                "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
-                title_generation_message,
-                Some(0.),
-                Some(1000),
-            )
-            .await
-            .unwrap();
+            let chat_name = task_state
+                .inference()
+                .chutes
+                .clone()
+                .prompt_completion_non_streaming(
+                    "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
+                    title_generation_message,
+                    Some(0.),
+                    Some(1000),
+                )
+                .await
+                .unwrap();
 
             let _ = task_tx
                 .send_async(ApiDelta::Control(ControlChunk::ChatNameUpdated {
@@ -296,6 +295,7 @@ pub async fn handler(
                 .await;
 
             task_state
+                .storage()
                 .database()
                 .chats
                 .update(chat.id.unwrap(), doc! { "$set": { "name": chat_name } })
@@ -305,11 +305,14 @@ pub async fn handler(
     }
 
     let user_message_id = state
+        .storage()
         .database()
         .messages
         .create(user_message.clone())
         .await
-        .unwrap();
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
     let stream_id = Uuid::new_v4();
     let task_state = Arc::clone(&state);
@@ -321,7 +324,11 @@ pub async fn handler(
             } else {
                 task_state
                     .search()
-                    .search(search_query.to_string())
+                    .search(WebSearchOptions {
+                        language: "en".to_string(),
+                        query: search_query.to_string(),
+                        region: "us".to_string(),
+                    })
                     .await
                     .ok()
             }
@@ -362,8 +369,7 @@ pub async fn handler(
 
         let message_for_assistant = if let Some(results) = search_results {
             let context: String = results
-                .organic
-                .iter()
+                .into_iter()
                 .take(10)
                 .map(|result| {
                     format!(
@@ -409,7 +415,9 @@ pub async fn handler(
                         ChatMessageContent::Image { id } => {
                             // if cfg!(debug_assertions) {
                             let mut file = task_state
+                                .storage()
                                 .bucket()
+                                .gridfs()
                                 .open_download_stream(Bson::ObjectId(id))
                                 .await
                                 .unwrap();
@@ -437,7 +445,9 @@ pub async fn handler(
                         }
                         ChatMessageContent::Pdf { id } => {
                             let mut file = task_state
+                                .storage()
                                 .bucket()
+                                .gridfs()
                                 .open_download_stream(Bson::ObjectId(id))
                                 .await
                                 .unwrap();
@@ -476,6 +486,7 @@ pub async fn handler(
         let task_memories = memories.clone();
         tokio::spawn(async move {
             task2_state
+                .storage()
                 .database()
                 .messages
                 .create(task_message)
@@ -501,18 +512,18 @@ Existing memories: {};
 Current user message: {:?}
 Your output:", if task_memories.is_empty() { "No memories yet".to_string() } else { serde_json::to_string(&task_memories).unwrap() }, payload.message.trim());
 
-                let memory = OpenAIClient::new(
-                    env::var("CHUTES_KEY").unwrap(),
-                    "https://llm.chutes.ai/v1/completions".to_string(),
-                )
-                .prompt_completion_non_streaming(
-                    "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
-                    prompt,
-                    Some(0.3),
-                    Some(1000),
-                )
-                .await
-                .unwrap();
+                let memory = task2_state
+                    .inference()
+                    .chutes
+                    .clone()
+                    .prompt_completion_non_streaming(
+                        "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
+                        prompt,
+                        Some(0.3),
+                        Some(1000),
+                    )
+                    .await
+                    .unwrap();
 
                 if memory.trim().starts_with("NONE") {
                     return;
@@ -534,16 +545,18 @@ Your output:", if task_memories.is_empty() { "No memories yet".to_string() } els
                 let memory = memory.to_string();
 
                 let memory_id = task2_state
+                    .storage()
                     .database()
                     .memories
                     .create(Memory {
                         id: None,
-                        user_id,
+                        user_id: session.user_id,
                         content: memory.clone(),
                     })
                     .await
                     .unwrap();
                 task2_state
+                    .storage()
                     .database()
                     .messages
                     .update(
@@ -657,6 +670,7 @@ Your output:", if task_memories.is_empty() { "No memories yet".to_string() } els
         }))
         .unwrap();
         task_state
+            .storage()
             .database()
             .messages
             .update(
@@ -684,7 +698,7 @@ Your output:", if task_memories.is_empty() { "No memories yet".to_string() } els
         })
         .collect();
 
-    (
+    Ok((
         StatusCode::OK,
         Json(json!({
           "stream_id": stream_id,
@@ -700,5 +714,5 @@ Your output:", if task_memories.is_empty() { "No memories yet".to_string() } els
           }
         })),
     )
-        .into_response()
+        .into_response())
 }

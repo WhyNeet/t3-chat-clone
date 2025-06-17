@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -9,10 +10,13 @@ use model::{message::ChatMessageContent, share::Share};
 use mongodb::bson::{doc, oid::ObjectId};
 use redis_om::HashModel;
 use serde::Deserialize;
-use serde_json::json;
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, database::DatabaseError},
+    },
     middleware::auth::Auth,
     payload::chat::{ChatMessageContentPayload, ChatMessagePayload},
     state::AppState,
@@ -30,42 +34,39 @@ pub async fn handler(
     Auth(session): Auth,
     Path(chat_id): Path<ObjectId>,
     Query(payload): Query<ListChatMessagesPayload>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, ApplicationError> {
     let chat = if let Some(id) = payload.share_id {
-        let mut conn = state.redis();
+        let mut conn = state.storage().cache().connection();
         let share = Share::get(chat_id.to_hex(), &mut conn).await.unwrap();
         if id.to_hex() != share.share_id {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(json!({ "error": "Chat is not shared with this link." })),
-            )
-                .into_response();
+            return Err(ApplicationError::InvalidShareLink);
         }
-        state.database().chats.get(doc! { "_id": chat_id }).await
-    } else {
         state
+            .storage()
             .database()
             .chats
-            .get(doc! { "user_id": ObjectId::from_str(&session.user_id).unwrap(), "_id": chat_id })
+            .get(doc! { "_id": chat_id })
             .await
-    };
+    } else {
+        state
+            .storage()
+            .database()
+            .chats
+            .get(doc! { "user_id": session.user_id, "_id": chat_id })
+            .await
+    }
+    .map_err(|e| {
+        ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+    })?;
 
-    let Ok(chat) = chat else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Internal error." })),
-        )
-            .into_response();
-    };
     let Some(chat) = chat else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not exist." })),
-        )
-            .into_response();
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::ChatDoesNotExist,
+        )));
     };
 
-    let Ok(messages) = state
+    let messages = state
+        .storage()
         .database()
         .messages
         .get_many_sorted(
@@ -73,11 +74,11 @@ pub async fn handler(
             doc! { "timestamp": -1 },
         )
         .await
-    else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
-    let Ok(messages) = messages
+    let messages = messages
         .skip(payload.start)
         .take(payload.take)
         .map(|message| {
@@ -104,13 +105,11 @@ pub async fn handler(
         })
         .try_collect::<Vec<_>>()
         .await
-    else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": "Internal error." })),
-        )
-            .into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(
+                anyhow!(e),
+            )))
+        })?;
 
-    (StatusCode::OK, Json(messages)).into_response()
+    Ok((StatusCode::OK, Json(messages)).into_response())
 }

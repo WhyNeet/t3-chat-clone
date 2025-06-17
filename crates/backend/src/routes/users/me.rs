@@ -1,35 +1,43 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
-use mongodb::bson::oid::ObjectId;
-use serde_json::json;
 
-use crate::{middleware::auth::Auth, payload::auth::UserPayload, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, database::DatabaseError},
+    },
+    middleware::auth::Auth,
+    payload::auth::UserPayload,
+    state::AppState,
+};
 
-pub async fn handler(State(state): State<Arc<AppState>>, Auth(session): Auth) -> impl IntoResponse {
-    let Ok(user) = state
+pub async fn handler(
+    State(state): State<Arc<AppState>>,
+    Auth(session): Auth,
+) -> Result<impl IntoResponse, ApplicationError> {
+    let user = state
+        .storage()
         .database()
         .users
-        .get_by_id(ObjectId::from_str(&session.user_id).unwrap())
+        .get_by_id(session.user_id)
         .await
-    else {
-        return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
-    };
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
 
     let Some(user) = user else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "User does not exist." })),
-        )
-            .into_response();
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::UserDoesNotExist,
+        )));
     };
 
-    (
+    Ok((
         StatusCode::OK,
         Json(UserPayload {
             id: user.id.unwrap(),
             email: user.email,
         }),
     )
-        .into_response()
+        .into_response())
 }

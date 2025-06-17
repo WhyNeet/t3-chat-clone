@@ -11,33 +11,43 @@ use redis_om::HashModel;
 use reqwest::StatusCode;
 use serde_json::json;
 
-use crate::{middleware::auth::Auth, state::AppState};
+use crate::{
+    errors::{
+        ApplicationError,
+        storage::{StorageError, cache::CacheError, database::DatabaseError},
+    },
+    middleware::auth::Auth,
+    state::AppState,
+};
 
 pub async fn handler(
     State(state): State<Arc<AppState>>,
     Auth(session): Auth,
     Path(chat_id): Path<ObjectId>,
-) -> impl IntoResponse {
-    let Ok(chat) = state.database().chats.get_by_id(chat_id).await else {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    };
+) -> Result<impl IntoResponse, ApplicationError> {
+    let chat = state
+        .storage()
+        .database()
+        .chats
+        .get_by_id(chat_id)
+        .await
+        .map_err(|e| {
+            ApplicationError::StorageError(StorageError::DatabaseError(DatabaseError::Unknown(e)))
+        })?;
+
     let Some(chat) = chat else {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not exist." })),
-        )
-            .into_response();
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::ChatDoesNotExist,
+        )));
     };
 
-    if chat.user_id.to_hex() != session.user_id {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": "Chat does not belong to user." })),
-        )
-            .into_response();
+    if chat.user_id != session.user_id {
+        return Err(ApplicationError::StorageError(StorageError::DatabaseError(
+            DatabaseError::ChatDoesNotBelongToUser,
+        )));
     }
 
-    let mut conn = state.redis();
+    let mut conn = state.storage().cache().connection();
 
     let share_id = ObjectId::new();
     let mut share = Share {
@@ -45,9 +55,9 @@ pub async fn handler(
         share_id: share_id.to_hex(),
     };
 
-    if share.save(&mut conn).await.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+    share.save(&mut conn).await.map_err(|e| {
+        ApplicationError::StorageError(StorageError::CacheError(CacheError::Unknown(e)))
+    })?;
 
-    (StatusCode::OK, Json(json!({ "id": share_id.to_hex() }))).into_response()
+    Ok((StatusCode::OK, Json(json!({ "id": share_id.to_hex() }))).into_response())
 }

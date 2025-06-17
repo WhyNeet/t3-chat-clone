@@ -1,4 +1,4 @@
-import { Key, Telescope } from "lucide-react";
+import { Key } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { useNavigate } from "react-router";
 import { useChatsStore } from "../../lib/state/chats";
@@ -43,7 +43,7 @@ export function NewChat() {
           What will you do today?
         </p>
         <div className="flex gap-2 mb-4">
-          <Button
+          {/* <Button
             intent="secondary"
             rounded="circle"
             size="small"
@@ -51,7 +51,7 @@ export function NewChat() {
           >
             <Telescope className="h-5 w-5" />
             Explore Features
-          </Button>
+          </Button> */}
           <Button
             intent="secondary"
             rounded="circle"

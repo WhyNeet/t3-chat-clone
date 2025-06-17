@@ -130,7 +130,7 @@ export function SharedChat() {
 
   return (
     <div
-      className="w-full h-full overflow-y-scroll p-6 pb-32 pt-14 overscroll-contain"
+      className="w-full h-full overflow-y-scroll p-6 pb-10 pt-14 overscroll-contain"
       ref={scrollWrapper}
     >
       {chat ? (

@@ -110,7 +110,7 @@ export default function Prompt() {
     if (!chatId) {
       const chat = await createChat();
       addChat(chat, []);
-      localStorage.setItem(`chat-model-${chatId}`, selectedModel.identifier);
+      localStorage.setItem(`chat-model-${chat.id}`, selectedModel.identifier);
       navigate(`/chat/${chat.id}`);
       sendAndSubscribe(
         chat.id,

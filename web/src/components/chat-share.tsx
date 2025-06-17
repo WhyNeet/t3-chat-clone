@@ -1,4 +1,4 @@
-import { CopyIcon, ShareIcon } from "lucide-react"
+import { CheckIcon, CopyIcon, ShareIcon } from "lucide-react"
 import { Button } from "./ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
 import { useEffect, useState } from "react"
@@ -28,6 +28,7 @@ export const ChatShare = ({ id }: { id: string | null }) => {
 export const ChatShareState = ({ id }: { id: string }) => {
   const [shareState, setShareState] = useState<Share | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const link = shareState ? ((import.meta.env.DEV ? "http://localhost:5173/" : "https://whychat.vercel.app/") + (`chat/shared/${shareState.id}?id=${shareState.share_id}`)) : null;
 
   useEffect(() => {
@@ -52,6 +53,8 @@ export const ChatShareState = ({ id }: { id: string }) => {
 
   const handleCopyClick = () => {
     navigator.clipboard.writeText(link!);
+    if (!isCopied) setTimeout(() => setIsCopied(false), 1000);
+    setIsCopied(true);
   };
 
   if (isLoading) return <div className="text-sm font-display font-medium flex items-center gap-4 text-pink-900"><Loader className="text-pink-900 h-5 w-5" />Loading...</div>;
@@ -63,7 +66,7 @@ export const ChatShareState = ({ id }: { id: string }) => {
         <div className="max-w-full overflow-x-hidden overflow-ellipsis">{link}</div>
         <div className="h-full flex items-center absolute right-0 inset-y-0 pr-2 pl-8 -bg-linear-90 from-pink-100 from-50% to-transparent z-10">
           <button className="h-4 w-4 cursor-pointer" onClick={handleCopyClick}>
-            <CopyIcon className="h-4 w-4" />
+            {isCopied ? <CheckIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
           </button>
         </div>
       </div>

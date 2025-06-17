@@ -11,6 +11,7 @@ import { useLocation } from "react-router";
 import { listUnsentFiles } from "../../lib/api/files";
 import { ChatShare } from "../../components/chat-share";
 import { Memories } from "../../components/memories";
+import { ModelProvider } from "../../lib/model/service";
 
 const Message = lazy(() => import("../../components/message"));
 const Prompt = lazy(() => import("../../components/prompt"));
@@ -48,7 +49,7 @@ export function Chat() {
   const [batchLoading, setBatchLoading] = useState(false);
   const batchLoadingInternal = useRef(false);
   const inferenceError: number | null = useServiceStore(
-    (state) => state.inferenceError["openrouter"] ?? null,
+    (state) => state.inferenceError[ModelProvider.OpenRouter] ?? null,
   );
   const location = useLocation();
   const setUploads = useChatsStore(state => state.setUploads);

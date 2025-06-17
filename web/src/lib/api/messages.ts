@@ -69,8 +69,8 @@ export const sendAndSubscribe = async (
   } = useChatsStore.getState();
   const { setInferenceError, removeInferenceError } = useServiceStore.getState();
   const { addMemory } = useMemoryStore.getState();
-  const provider = model.base_url;
-  removeInferenceError("openrouter");
+  const provider = model.provider;
+  removeInferenceError(provider);
   const { stream_id, user_message } = await createMessage(chatId, payload);
   addMessages(chatId, [user_message]);
   localStorage.setItem(`chat-model-${chatId}`, model.identifier);
@@ -107,12 +107,9 @@ export const sendAndSubscribe = async (
         updateChatName(chatId, control.control.name);
       } else if (is.inferenceError(control.control)) {
         console.log("error", provider, control);
-        if (
-          provider === "https://openrouter.ai/api/v1/chat/completions"
-        ) {
-          setInferenceError("openrouter", control.control.code);
-          console.error("code", control.control.code);
-        }
+        setInferenceError(model.provider, control.control.code);
+        console.error("code", control.control.code);
+
         localStorage.removeItem(`stream-${chatId}`);
         localStorage.removeItem(`streaming-message-${chatId}`);
         localStorage.removeItem(`streaming-message-reasoning-${chatId}`);

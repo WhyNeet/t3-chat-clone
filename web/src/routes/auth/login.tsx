@@ -47,6 +47,7 @@ export function Login() {
         <Input
           placeholder="Email"
           type="text"
+          autoComplete="off"
           className="w-full"
           {...register("email", {
             required: { value: true, message: "Required." },

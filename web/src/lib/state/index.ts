@@ -70,7 +70,7 @@ export async function init() {
             const memoryString = localStorage.getItem(`streaming-message-${chat.id}-memory`);
             const memory: Memory | null = memoryString ? JSON.parse(memoryString) : null;
             const provider_data = models.free.find(m => m.name === model) ?? models.paid.find(m => m.name === model)!;
-            const provider = provider_data.base_url;
+            const provider = provider_data.provider;
             initPendingMessage(chat.id, model ?? "AI", isSearching, memory?.content ?? null);
             updatePendingMessage(chat.id, { content: message, reasoning, memory: memory?.content ?? null });
             subscribeToStream(
@@ -102,9 +102,8 @@ export async function init() {
                 } else if (is.chatNameUpdated(control.control)) {
                   updateChatName(chat.id, control.control.name);
                 } else if (is.inferenceError(control.control)) {
-                  if (provider === "https://https://openrouter.ai/api/v1/chat/completions") {
-                    setInferenceError("openrouter", control.control.code);
-                  }
+                  setInferenceError(provider, control.control.code);
+
                   localStorage.removeItem(`stream-${chat.id}`);
                   localStorage.removeItem(`streaming-message-${chat.id}`);
                   localStorage.removeItem(

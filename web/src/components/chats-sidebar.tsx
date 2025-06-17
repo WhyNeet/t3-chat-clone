@@ -1,4 +1,4 @@
-import { NavLink } from "react-router";
+import { NavLink, useLocation } from "react-router";
 import { Logo } from "./logo";
 import { useChatsStore } from "../lib/state/chats";
 import { AuthState, useAuthStore } from "../lib/state/auth";
@@ -47,6 +47,7 @@ export function ChatsSidebar() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [currentRenameId, setCurrentRenameId] = useState<string | null>(null);
   const [currentRename, setCurrentRename] = useState("");
+  const location = useLocation();
 
   const handleRenameChat = async () => {
     await renameChat(currentRenameId!, currentRename);
@@ -58,7 +59,8 @@ export function ChatsSidebar() {
     await deleteChat(id);
     deleteChatState(id);
     localStorage.removeItem(`chat-model-${id}`);
-    navigate("/");
+    const segments = location.pathname.split("/");
+    if (segments[segments.length - 1] === id) navigate("/");
   };
 
   const handleLogOut = async () => {

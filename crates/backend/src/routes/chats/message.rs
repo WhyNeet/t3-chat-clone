@@ -280,13 +280,18 @@ pub async fn handler(
                 .chutes
                 .clone()
                 .prompt_completion_non_streaming(
-                    "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
+                    "zai-org/GLM-4.5-Air".to_string(),
                     title_generation_message,
                     Some(0.),
                     Some(1000),
                 )
                 .await
                 .unwrap();
+            let chat_name = if chat_name.contains("</think>") {
+                chat_name.split_once("</think>").unwrap().1.to_string()
+            } else {
+                chat_name
+            };
 
             let _ = task_tx
                 .send_async(ApiDelta::Control(ControlChunk::ChatNameUpdated {
@@ -517,13 +522,19 @@ Your output:", if task_memories.is_empty() { "No memories yet".to_string() } els
                     .chutes
                     .clone()
                     .prompt_completion_non_streaming(
-                        "chutesai/Mistral-Small-3.1-24B-Instruct-2503".to_string(),
+                        "zai-org/GLM-4.5-Air".to_string(),
                         prompt,
                         Some(0.3),
                         Some(1000),
                     )
                     .await
                     .unwrap();
+
+                let memory = if memory.contains("</think>") {
+                    memory.split_once("</think>").unwrap().1.to_string()
+                } else {
+                    memory
+                };
 
                 if memory.trim().starts_with("NONE") {
                     return;

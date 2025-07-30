@@ -53,7 +53,7 @@ pub async fn handler(
 
     let Some(user) = user else {
         return Err(ApplicationError::StorageError(StorageError::DatabaseError(
-            DatabaseError::UserAlreadyExists,
+            DatabaseError::UserDoesNotExist,
         )));
     };
 
